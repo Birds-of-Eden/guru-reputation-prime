@@ -20,7 +20,6 @@ export async function GET(
         name: true,
         description: true,
         totalMonths: true,
-        type: true,
         _count: {
           select: {
             clients: true,

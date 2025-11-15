@@ -745,7 +745,7 @@ export function AppSidebar({ className }: { className?: string }) {
                 <GalleryVerticalEnd className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold">Net Reputation</h1>
+                <h1 className="text-sm font-bold">Reputation Prime</h1>
                 <p className="text-xs text-muted-foreground">Enterprise Plan</p>
               </div>
             </div>

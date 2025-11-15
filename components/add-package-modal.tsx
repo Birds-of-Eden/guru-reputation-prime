@@ -28,7 +28,6 @@ interface AddPackageModalProps {
     name: string;
     description?: string;
     totalMonths?: number;
-    type?: string;
   }) => void;
   isEdit?: boolean;
   initialData?: {
@@ -36,7 +35,6 @@ interface AddPackageModalProps {
     name: string | null;
     description?: string | null;
     totalMonths?: number;
-    type?: string;
   };
   onUpdate?: (
     id: string,
@@ -44,7 +42,6 @@ interface AddPackageModalProps {
       name: string;
       description?: string;
       totalMonths?: number;
-      type?: string;
     }
   ) => void;
 }
@@ -60,7 +57,6 @@ export function AddPackageModal({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [totalMonths, setTotalMonths] = useState<number | "">("");
-  const [type, setType] = useState<string>("INDIVIDUAL");
   const [errors, setErrors] = useState<{
     name?: string;
     totalMonths?: string;
@@ -71,12 +67,10 @@ export function AddPackageModal({
       setName(initialData.name || "");
       setDescription(initialData.description || "");
       setTotalMonths(initialData.totalMonths ?? "");
-      setType(initialData.type || "INDIVIDUAL");
     } else {
       setName("");
       setDescription("");
       setTotalMonths("");
-      setType("INDIVIDUAL");
     }
     setErrors({});
   }, [isOpen, isEdit, initialData]);
@@ -110,7 +104,6 @@ export function AddPackageModal({
       name: name.trim(),
       description: description.trim() || undefined,
       totalMonths: totalMonths === "" ? undefined : Number(totalMonths),
-      type: type,
     };
 
     if (isEdit && initialData && onUpdate) {
@@ -123,7 +116,7 @@ export function AddPackageModal({
     setName("");
     setDescription("");
     setTotalMonths("");
-    setType("INDIVIDUAL");
+   
     setErrors({});
     onClose();
   };
@@ -186,30 +179,6 @@ export function AddPackageModal({
                 {errors.name}
               </div>
             )}
-          </div>
-
-          {/* Package Type Field */}
-          <div className="space-y-2">
-            <Label
-              htmlFor="type"
-              className="text-sm font-medium text-gray-700 flex items-center gap-2"
-            >
-              <Tag className="h-4 w-4" />
-              Orm Type *
-            </Label>
-            <Select value={type} onValueChange={setType}>
-              <SelectTrigger className="transition-all duration-200 focus:border-blue-500 focus:ring-blue-200">
-                <SelectValue placeholder="Select package type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="INDIVIDUAL">Individual</SelectItem>
-                <SelectItem value="BUSINESS">Business</SelectItem>
-                <SelectItem value="CUSTOM">Custom</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-gray-500">
-              Choose the type that best describes this package
-            </p>
           </div>
 
           {/* Description Field */}

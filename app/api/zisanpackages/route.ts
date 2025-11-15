@@ -17,7 +17,6 @@ export async function GET(request: Request) {
           name: true,
           description: true,
           totalMonths: true,
-          type: true,
           createdAt: true,
           updatedAt: true,
           _count: { select: { clients: true, templates: true } },
@@ -34,7 +33,6 @@ export async function GET(request: Request) {
         name: true,
         description: true,
         totalMonths: true,
-        type: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { clients: true, templates: true } },
@@ -199,7 +197,6 @@ export async function POST(request: Request) {
           name: name.trim(),
           description: description?.trim() || null,
           totalMonths: totalMonths as number | null,
-          type: type || "INDIVIDUAL", // ✅ save package type
         },
       });
 
@@ -215,7 +212,6 @@ export async function POST(request: Request) {
             name: pkg.name,
             description: pkg.description ?? null,
             totalMonths: pkg.totalMonths ?? null,
-            type: pkg.type ?? null, // ✅ include type in log
           },
         },
       });

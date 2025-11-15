@@ -1,3 +1,4 @@
+//prisma schema for reputation prime - Faysal 13/11/2025
 generator client {
   provider = "prisma-client-js"
 }
@@ -89,12 +90,6 @@ enum MessageType {
   system
 }
 
-enum PackageType {
-  INDIVIDUAL
-  BUSINESS
-  CUSTOM
-}
-
 // ========== AUTHENTICATION MODELS ==========
 model User {
   id            String   @id @default(cuid())
@@ -142,16 +137,7 @@ model User {
 
   lastSeenAt DateTime?
 
-  user_field_01 String? 
-  user_field_02 String? 
-  user_field_03 Int? 
-  user_field_04 Int? 
-  user_field_05 Boolean? 
-  user_field_06 Json? 
-  user_field_07 Json? 
-  user_field_08 Json? 
-  user_field_09 Json? 
-  user_field_10 Json? 
+
 }
 
 model Session {
@@ -169,16 +155,7 @@ model Session {
 
   @@index([impersonatedBy])
 
-  session_field_01 String? 
-  session_field_02 String? 
-  session_field_03 Int? 
-  session_field_04 Int? 
-  session_field_05 Boolean? 
-  session_field_06 Json? 
-  session_field_07 Json? 
-  session_field_08 Json? 
-  session_field_09 Json? 
-  session_field_10 Json? 
+
 }
 
 model Account {
@@ -198,16 +175,7 @@ model Account {
   createdAt             DateTime
   updatedAt             DateTime
 
-  account_field_01 String? 
-  account_field_02 String? 
-  account_field_03 Int? 
-  account_field_04 Int? 
-  account_field_05 Boolean? 
-  account_field_06 Json? 
-  account_field_07 Json? 
-  account_field_08 Json? 
-  account_field_09 Json? 
-  account_field_10 Json? 
+
 }
 
 model Verification {
@@ -218,16 +186,6 @@ model Verification {
   createdAt  DateTime?
   updatedAt  DateTime?
 
-  verification_field_01 String? 
-  verification_field_02 String? 
-  verification_field_03 Int? 
-  verification_field_04 Int? 
-  verification_field_05 Boolean? 
-  verification_field_06 Json? 
-  verification_field_07 Json? 
-  verification_field_08 Json? 
-  verification_field_09 Json? 
-  verification_field_10 Json? 
 }
 
 // ========== ROLES & PERMISSIONS ==========
@@ -238,16 +196,7 @@ model Role {
   users           User[]
   rolePermissions RolePermission[]
 
-  role_field_01 String? 
-  role_field_02 String? 
-  role_field_03 Int? 
-  role_field_04 Int? 
-  role_field_05 Boolean? 
-  role_field_06 Json? 
-  role_field_07 Json? 
-  role_field_08 Json? 
-  role_field_09 Json? 
-  role_field_10 Json? 
+
 }
 
 model Permission {
@@ -256,16 +205,7 @@ model Permission {
   description     String?
   rolePermissions RolePermission[]
 
-  permission_field_01 String? 
-  permission_field_02 String? 
-  permission_field_03 Int? 
-  permission_field_04 Int? 
-  permission_field_05 Boolean? 
-  permission_field_06 Json? 
-  permission_field_07 Json? 
-  permission_field_08 Json? 
-  permission_field_09 Json? 
-  permission_field_10 Json? 
+
 }
 
 model RolePermission {
@@ -276,16 +216,7 @@ model RolePermission {
 
   @@id([roleId, permissionId])
 
-  rolepermission_field_01 String? 
-  rolepermission_field_02 String? 
-  rolepermission_field_03 Int? 
-  rolepermission_field_04 Int? 
-  rolepermission_field_05 Boolean? 
-  rolepermission_field_06 Json? 
-  rolepermission_field_07 Json? 
-  rolepermission_field_08 Json? 
-  rolepermission_field_09 Json? 
-  rolepermission_field_10 Json? 
+
 }
 
 // ========== TEAMS ==========
@@ -295,17 +226,6 @@ model Team {
   description         String?
   clientTeamMembers   ClientTeamMember[]
   templateTeamMembers TemplateTeamMember[]
-
-  team_field_01 String? 
-  team_field_02 String? 
-  team_field_03 Int? 
-  team_field_04 Int? 
-  team_field_05 Boolean? 
-  team_field_06 Json? 
-  team_field_07 Json? 
-  team_field_08 Json? 
-  team_field_09 Json? 
-  team_field_10 Json? 
 }
 
 // ========== PACKAGES ==========
@@ -314,23 +234,12 @@ model Package {
   name        String?    @unique
   description String?
   totalMonths Int?
-  type        PackageType @default(INDIVIDUAL)
   clients     Client[]
   templates   Template[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  package_field_01 String? 
-  package_field_02 String? 
-  package_field_03 Int? 
-  package_field_04 Int? 
-  package_field_05 Boolean? 
-  package_field_06 Json? 
-  package_field_07 Json? 
-  package_field_08 Json? 
-  package_field_09 Json? 
-  package_field_10 Json? 
 }
 
 // ========== TASK CATEGORIES ==========
@@ -340,16 +249,6 @@ model TaskCategory {
   description String?
   tasks       Task[]
 
-  taskcategory_field_01 String? 
-  taskcategory_field_02 String? 
-  taskcategory_field_03 Int? 
-  taskcategory_field_04 Int? 
-  taskcategory_field_05 Boolean? 
-  taskcategory_field_06 Json? 
-  taskcategory_field_07 Json? 
-  taskcategory_field_08 Json? 
-  taskcategory_field_09 Json? 
-  taskcategory_field_10 Json? 
 }
 
 // ========== CLIENTS ==========
@@ -397,16 +296,6 @@ model Client {
 
   @@index([amId])
 
-  client_field_01 String? 
-  client_field_02 String? 
-  client_field_03 Int? 
-  client_field_04 Int? 
-  client_field_05 Boolean? 
-  client_field_06 Json? 
-  client_field_07 Json? 
-  client_field_08 Json? 
-  client_field_09 Json? 
-  client_field_10 Json? 
 }
 
 // ========== CLIENT TEAM MEMBERS ==========
@@ -426,16 +315,7 @@ model ClientTeamMember {
 
   @@id([clientId, agentId])
 
-  clientteammember_field_01 String? 
-  clientteammember_field_02 String? 
-  clientteammember_field_03 Int? 
-  clientteammember_field_04 Int? 
-  clientteammember_field_05 Boolean? 
-  clientteammember_field_06 Json? 
-  clientteammember_field_07 Json? 
-  clientteammember_field_08 Json? 
-  clientteammember_field_09 Json? 
-  clientteammember_field_10 Json? 
+
 }
 
 // ========== TEMPLATES ==========
@@ -451,16 +331,7 @@ model Template {
   sitesAssets         TemplateSiteAsset[]
   assignments         Assignment[]
 
-  template_field_01 String? 
-  template_field_02 String? 
-  template_field_03 Int? 
-  template_field_04 Int? 
-  template_field_05 Boolean? 
-  template_field_06 Json? 
-  template_field_07 Json? 
-  template_field_08 Json? 
-  template_field_09 Json? 
-  template_field_10 Json? 
+
 }
 
 // ========== TEMPLATE SITES/ASSETS ==========
@@ -479,16 +350,6 @@ model TemplateSiteAsset {
   assignmentSettings AssignmentSiteAssetSetting[]
   tasks              Task[]
 
-  templatesiteasset_field_01 String? 
-  templatesiteasset_field_02 String? 
-  templatesiteasset_field_03 Int? 
-  templatesiteasset_field_04 Int? 
-  templatesiteasset_field_05 Boolean? 
-  templatesiteasset_field_06 Json? 
-  templatesiteasset_field_07 Json? 
-  templatesiteasset_field_08 Json? 
-  templatesiteasset_field_09 Json? 
-  templatesiteasset_field_10 Json? 
 }
 
 // ========== TEMPLATE TEAM MEMBERS ==========
@@ -505,16 +366,6 @@ model TemplateTeamMember {
 
   @@id([templateId, agentId])
 
-  templateteammember_field_01 String? 
-  templateteammember_field_02 String? 
-  templateteammember_field_03 Int? 
-  templateteammember_field_04 Int? 
-  templateteammember_field_05 Boolean? 
-  templateteammember_field_06 Json? 
-  templateteammember_field_07 Json? 
-  templateteammember_field_08 Json? 
-  templateteammember_field_09 Json? 
-  templateteammember_field_10 Json? 
 }
 
 // ========== ASSIGNMENTS ==========
@@ -530,16 +381,7 @@ model Assignment {
   tasks             Task[]
   siteAssetSettings AssignmentSiteAssetSetting[]
 
-  assignment_field_01 String? 
-  assignment_field_02 String? 
-  assignment_field_03 Int? 
-  assignment_field_04 Int? 
-  assignment_field_05 Boolean? 
-  assignment_field_06 Json? 
-  assignment_field_07 Json? 
-  assignment_field_08 Json? 
-  assignment_field_09 Json? 
-  assignment_field_10 Json? 
+
 }
 
 // ========== ASSIGNMENT SITE/ASSET SETTINGS ==========
@@ -554,16 +396,6 @@ model AssignmentSiteAssetSetting {
   period               PeriodType        @default(monthly)
   idealDurationMinutes Int?
 
-  assignmentsiteassetsetting_field_01 String? 
-  assignmentsiteassetsetting_field_02 String? 
-  assignmentsiteassetsetting_field_03 Int? 
-  assignmentsiteassetsetting_field_04 Int? 
-  assignmentsiteassetsetting_field_05 Boolean? 
-  assignmentsiteassetsetting_field_06 Json? 
-  assignmentsiteassetsetting_field_07 Json? 
-  assignmentsiteassetsetting_field_08 Json? 
-  assignmentsiteassetsetting_field_09 Json? 
-  assignmentsiteassetsetting_field_10 Json? 
 }
 
 // ========== TASKS ==========
@@ -609,16 +441,6 @@ model Task {
   reports       Report[]
   notifications Notification[]
 
-  task_field_01 String? 
-  task_field_02 String? 
-  task_field_03 Int? 
-  task_field_04 Int? 
-  task_field_05 Boolean? 
-  task_field_06 Json? 
-  task_field_07 Json? 
-  task_field_08 Json? 
-  task_field_09 Json? 
-  task_field_10 Json? 
 }
 
 // ========== COMMENTS ==========
@@ -632,16 +454,7 @@ model Comment {
   task   Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
   author User? @relation(fields: [authorId], references: [id])
 
-  comment_field_01 String? 
-  comment_field_02 String? 
-  comment_field_03 Int? 
-  comment_field_04 Int? 
-  comment_field_05 Boolean? 
-  comment_field_06 Json? 
-  comment_field_07 Json? 
-  comment_field_08 Json? 
-  comment_field_09 Json? 
-  comment_field_10 Json? 
+
 }
 
 // ========== REPORTS ==========
@@ -656,16 +469,7 @@ model Report {
   task   Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
   author User? @relation(fields: [authorId], references: [id])
 
-  report_field_01 String? 
-  report_field_02 String? 
-  report_field_03 Int? 
-  report_field_04 Int? 
-  report_field_05 Boolean? 
-  report_field_06 Json? 
-  report_field_07 Json? 
-  report_field_08 Json? 
-  report_field_09 Json? 
-  report_field_10 Json? 
+
 }
 
 // ========== ACTIVITY LOG ==========
@@ -680,16 +484,6 @@ model ActivityLog {
 
   user User? @relation(fields: [userId], references: [id])
 
-  activitylog_field_01 String? 
-  activitylog_field_02 String? 
-  activitylog_field_03 Int? 
-  activitylog_field_04 Int? 
-  activitylog_field_05 Boolean? 
-  activitylog_field_06 Json? 
-  activitylog_field_07 Json? 
-  activitylog_field_08 Json? 
-  activitylog_field_09 Json? 
-  activitylog_field_10 Json? 
 }
 
 // ========== NOTIFICATIONS ==========
@@ -705,16 +499,6 @@ model Notification {
   user User  @relation(fields: [userId], references: [id])
   task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  notification_field_01 String? 
-  notification_field_02 String? 
-  notification_field_03 Int? 
-  notification_field_04 Int? 
-  notification_field_05 Boolean? 
-  notification_field_06 Json? 
-  notification_field_07 Json? 
-  notification_field_08 Json? 
-  notification_field_09 Json? 
-  notification_field_10 Json? 
 }
 
 // ---------- models ----------
@@ -734,16 +518,7 @@ model Conversation {
 
   @@index([type])
 
-  conversation_field_01 String? 
-  conversation_field_02 String? 
-  conversation_field_03 Int? 
-  conversation_field_04 Int? 
-  conversation_field_05 Boolean? 
-  conversation_field_06 Json? 
-  conversation_field_07 Json? 
-  conversation_field_08 Json? 
-  conversation_field_09 Json? 
-  conversation_field_10 Json? 
+ 
 }
 
 model ConversationParticipant {
@@ -760,17 +535,7 @@ model ConversationParticipant {
 
   @@id([conversationId, userId])
   @@index([userId])
-
-  conversationparticipant_field_01 String? 
-  conversationparticipant_field_02 String? 
-  conversationparticipant_field_03 Int? 
-  conversationparticipant_field_04 Int? 
-  conversationparticipant_field_05 Boolean? 
-  conversationparticipant_field_06 Json? 
-  conversationparticipant_field_07 Json? 
-  conversationparticipant_field_08 Json? 
-  conversationparticipant_field_09 Json? 
-  conversationparticipant_field_10 Json? 
+ 
 }
 
 model ChatMessage {
@@ -797,16 +562,6 @@ model ChatMessage {
 
   @@index([conversationId, createdAt])
 
-  chatmessage_field_01 String? 
-  chatmessage_field_02 String? 
-  chatmessage_field_03 Int? 
-  chatmessage_field_04 Int? 
-  chatmessage_field_05 Boolean? 
-  chatmessage_field_06 Json? 
-  chatmessage_field_07 Json? 
-  chatmessage_field_08 Json? 
-  chatmessage_field_09 Json? 
-  chatmessage_field_10 Json? 
 }
 
 model MessageReceipt {
@@ -821,16 +576,7 @@ model MessageReceipt {
   @@id([messageId, userId])
   @@index([userId, messageId])
 
-  messagereceipt_field_01 String? 
-  messagereceipt_field_02 String? 
-  messagereceipt_field_03 Int? 
-  messagereceipt_field_04 Int? 
-  messagereceipt_field_05 Boolean? 
-  messagereceipt_field_06 Json? 
-  messagereceipt_field_07 Json? 
-  messagereceipt_field_08 Json? 
-  messagereceipt_field_09 Json? 
-  messagereceipt_field_10 Json? 
+
 }
 
 model MessageReaction {
@@ -844,14 +590,4 @@ model MessageReaction {
 
   @@id([messageId, userId, emoji])
 
-  messagereaction_field_01 String? 
-  messagereaction_field_02 String? 
-  messagereaction_field_03 Int? 
-  messagereaction_field_04 Int? 
-  messagereaction_field_05 Boolean? 
-  messagereaction_field_06 Json? 
-  messagereaction_field_07 Json? 
-  messagereaction_field_08 Json? 
-  messagereaction_field_09 Json? 
-  messagereaction_field_10 Json? 
 }
