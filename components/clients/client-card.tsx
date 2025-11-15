@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 
-import type { Client, ClientTaskSummary } from "@/types/client";
+import type { Client, TaskStatusCounts } from "@/types/client";
 import { useUserSession } from "@/lib/hooks/use-user-session";
 import { hasPermissionClient } from "@/lib/permissions-client";
 import ImpersonateButton from "@/components/users/ImpersonateButton";
@@ -100,7 +100,32 @@ const ClientCardComponent = function ClientCard({
     return isNaN(d.getTime()) ? null : d;
   }, []);
 
-  // ⚡ Memoized month boundaries for fallback calculations
+  // ⚡ OPTIMIZED: Memoize task counts (runs only when tasks change)
+  const taskCounts = useMemo(() => {
+    const tasks = client.tasks || [];
+    const counts: TaskStatusCounts = {
+      pending: 0,
+      in_progress: 0,
+      completed: 0,
+      overdue: 0,
+      cancelled: 0,
+    };
+    for (const t of tasks) {
+      const s = normalizeStatus((t as any).status);
+      if (s in counts) (counts as any)[s]++;
+      else counts.pending++;
+    }
+    return counts;
+  }, [client.tasks, normalizeStatus]);
+
+  const totalTasks = client.tasks?.length || 0;
+  
+  const derivedProgress = useMemo(
+    () => (totalTasks ? Math.round((taskCounts.completed / totalTasks) * 100) : 0),
+    [totalTasks, taskCounts.completed]
+  );
+
+  // ⚡ OPTIMIZED: Memoize month boundaries (only recalculates when month changes)
   const { monthStart, monthEnd } = useMemo(() => {
     const now = new Date();
     return {
@@ -109,109 +134,51 @@ const ClientCardComponent = function ClientCard({
     };
   }, []);
 
-  const taskSummary = useMemo(() => {
-    if (client.taskSummary) return client.taskSummary;
-
+  // ⚡ OPTIMIZED: Memoize month progress calculation
+  const { derivedProgressThisMonth, completedThisMonth, totalThisMonth } = useMemo(() => {
     const tasks = client.tasks ?? [];
-    const fallback: ClientTaskSummary = {
-      total: tasks.length,
-      pending: 0,
-      in_progress: 0,
-      completed: 0,
-      overdue: 0,
-      cancelled: 0,
-      reassigned: 0,
-      thisMonth: {
-        total: 0,
-        completed: 0,
-        approved: 0,
-      },
+    
+    const getBestDate = (task: any): Date | null => {
+      return (
+        parseDate(task?.createdAt) ||
+        parseDate(task?.startDate) ||
+        parseDate(task?.dueDate)
+      );
     };
-
-    const getBestDate = (task: any): Date | null =>
-      parseDate(task?.createdAt) ||
-      parseDate(task?.startDate) ||
-      parseDate(task?.dueDate);
 
     const inThisMonth = (task: any) => {
       const d = getBestDate(task);
-      return d ? d >= monthStart && d < monthEnd : false;
+      if (!d) return false;
+      return d >= monthStart && d < monthEnd;
     };
 
-    for (const task of tasks) {
-      const status = normalizeStatus((task as any)?.status);
-      switch (status) {
-        case "completed":
-          fallback.completed += 1;
-          break;
-        case "in_progress":
-          fallback.in_progress += 1;
-          break;
-        case "overdue":
-          fallback.overdue += 1;
-          break;
-        case "cancelled":
-          fallback.cancelled += 1;
-          break;
-        case "reassigned":
-          fallback.reassigned += 1;
-          break;
-        default:
-          fallback.pending += 1;
-          break;
-      }
+    const tasksThisMonth = tasks.filter(inThisMonth);
+    const totalThisMonth = tasksThisMonth.length;
 
-      if (inThisMonth(task)) {
-        fallback.thisMonth.total += 1;
-      }
+    let completedThisMonth = 0;
+    let approvedThisMonth = 0;
 
-      const completedAt = parseDate((task as any)?.completedAt);
-      const normalizedStatus = (task?.status ?? "")
-        .toString()
-        .toLowerCase()
-        .replace(/[\-\s]+/g, "_");
+    for (const t of tasksThisMonth) {
+      const sRaw = (t as any)?.status?.toString().trim().toLowerCase().replace(/[\-\s]+/g, "_") || "";
+      const sNorm = normalizeStatus((t as any)?.status);
+      const completedAt = parseDate((t as any)?.completedAt);
 
-      const isCompletedInRange =
+      const isCompleted =
         (completedAt ? completedAt >= monthStart && completedAt < monthEnd : false) ||
-        status === "completed";
-      if (isCompletedInRange) {
-        fallback.thisMonth.completed += 1;
-      }
+        sNorm === "completed";
 
-      if (normalizedStatus === "qc_approved" || normalizedStatus === "approved") {
-        fallback.thisMonth.approved += 1;
-      }
+      const isApproved = sRaw === "qc_approved" || sRaw === "approved";
+
+      if (isCompleted) completedThisMonth++;
+      if (isApproved) approvedThisMonth++;
     }
 
-    fallback.total =
-      fallback.pending +
-      fallback.in_progress +
-      fallback.completed +
-      fallback.overdue +
-      fallback.cancelled +
-      fallback.reassigned;
+    const derivedProgressThisMonth = totalThisMonth
+      ? Math.round(((completedThisMonth + approvedThisMonth) / totalThisMonth) * 100)
+      : 0;
 
-    return fallback;
-  }, [client.taskSummary, client.tasks, monthEnd, monthStart, normalizeStatus, parseDate]);
-
-  const totalTasks = taskSummary.total;
-
-  const derivedProgress = useMemo(
-    () =>
-      totalTasks
-        ? Math.round((taskSummary.completed / totalTasks) * 100)
-        : 0,
-    [totalTasks, taskSummary.completed]
-  );
-
-  const totalThisMonth = taskSummary.thisMonth.total;
-  const derivedProgressThisMonth = totalThisMonth
-    ? Math.round(
-        ((taskSummary.thisMonth.completed + taskSummary.thisMonth.approved) /
-          totalThisMonth) *
-          100
-      )
-    : 0;
+    return { derivedProgressThisMonth, completedThisMonth, totalThisMonth };
+  }, [client.tasks, monthStart, monthEnd, normalizeStatus, parseDate]);
 
   // ⚡ OPTIMIZED: Memoize date formatting
   const formatDate = useCallback(
@@ -417,22 +384,22 @@ const ClientCardComponent = function ClientCard({
 
               <div className="text-gray-600">Completed:</div>
               <div className="font-medium text-emerald-700">
-                {taskSummary.completed}
+                {taskCounts.completed}
               </div>
 
               <div className="text-gray-600">In Progress:</div>
               <div className="font-medium text-blue-700">
-                {taskSummary.in_progress}
+                {taskCounts.in_progress}
               </div>
 
               <div className="text-gray-600">Pending:</div>
               <div className="font-medium text-amber-700">
-                {taskSummary.pending}
+                {taskCounts.pending}
               </div>
 
               <div className="text-gray-600">Overdue:</div>
               <div className="font-medium text-red-700">
-                {taskSummary.overdue}
+                {taskCounts.overdue}
               </div>
             </div>
           ) : (

@@ -1,6 +1,5 @@
 // app/api/clients/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { startOfMonth, addMonths } from "date-fns";
 import prisma from "@/lib/prisma";
 
 // Helper to normalize platform values
@@ -174,36 +173,6 @@ const normalizeArticleCategories = (input: unknown): ArticleCategory[] => {
     .filter(Boolean) as ArticleCategory[];
 };
 
-type ClientTaskSummary = {
-  total: number;
-  pending: number;
-  in_progress: number;
-  completed: number;
-  overdue: number;
-  cancelled: number;
-  reassigned: number;
-  thisMonth: {
-    total: number;
-    completed: number;
-    approved: number;
-  };
-};
-
-const createTaskSummary = (): ClientTaskSummary => ({
-  total: 0,
-  pending: 0,
-  in_progress: 0,
-  completed: 0,
-  overdue: 0,
-  cancelled: 0,
-  reassigned: 0,
-  thisMonth: {
-    total: 0,
-    completed: 0,
-    approved: 0,
-  },
-});
-
 // GET /api/clients - Get all clients (with clientUserId attached) or a single client by id
 export async function GET(req: Request) {
   try {
@@ -211,12 +180,6 @@ export async function GET(req: Request) {
     const id = searchParams.get("id");
     const packageId = searchParams.get("packageId");
     const amId = searchParams.get("amId");
-    const statusFilter = searchParams.get("status");
-    const searchQuery = searchParams.get("search")?.trim();
-    const includeTasks =
-      (searchParams.get("includeTasks") ?? "").toLowerCase() === "true";
-    const limitParam = Number(searchParams.get("take") ?? 500);
-    const take = Math.min(Math.max(limitParam, 1), 2000);
 
     if (id) {
       const client = await prisma.client.findUnique({
@@ -240,62 +203,44 @@ export async function GET(req: Request) {
       });
     }
 
-    const clientWhere: any = {
-      packageId: packageId || undefined,
-      amId: amId || undefined,
-    };
-
-    if (statusFilter && statusFilter !== "all") {
-      clientWhere.status = statusFilter;
-    }
-
-    if (searchQuery) {
-      clientWhere.OR = [
-        { name: { contains: searchQuery, mode: "insensitive" } },
-        { company: { contains: searchQuery, mode: "insensitive" } },
-        { email: { contains: searchQuery, mode: "insensitive" } },
-        { phone: { contains: searchQuery, mode: "insensitive" } },
-      ];
-    }
-
-    const clientSelect: any = {
-      id: true,
-      name: true,
-      company: true,
-      designation: true,
-      email: true,
-      phone: true,
-      avatar: true,
-      status: true,
-      progress: true,
-      packageId: true,
-      amId: true,
-      startDate: true,
-      dueDate: true,
-      createdAt: true,
-      socialMedia: true,
-      accountManager: { select: { id: true, name: true, email: true } },
-      package: { select: { id: true, name: true } },
-    };
-
-    if (includeTasks) {
-      clientSelect.tasks = {
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          dueDate: true,
-          completedAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-      };
-    }
-
     const clients = await prisma.client.findMany({
-      where: clientWhere,
-      select: clientSelect,
-      orderBy: { createdAt: "desc" },
-      take,
+      where: {
+        packageId: packageId || undefined,
+        amId: amId || undefined,
+      },
+      // Only select fields needed for the client list view
+      select: {
+        id: true,
+        name: true,
+        company: true,
+        designation: true,
+        email: true,
+        phone: true,
+        avatar: true,
+        status: true,
+        progress: true,
+        packageId: true,
+        amId: true,
+        startDate: true,
+        dueDate: true,
+        createdAt: true,
+        socialMedia: true,
+        accountManager: { select: { id: true, name: true, email: true } },
+        package: { select: { id: true, name: true } },
+        tasks: {
+          select: {
+            id: true,
+            status: true,
+            createdAt: true,
+            dueDate: true,
+            completedAt: true,
+          },
+        },
+      },
+      // Sort by recent first for better UX
+      orderBy: { createdAt: 'desc' },
+      // Limit to prevent overwhelming response (optional based on your needs)
+      take: 1000,
     });
 
     if (clients.length === 0) {
@@ -319,105 +264,11 @@ export async function GET(req: Request) {
       }
     }
 
-    // Pre-compute task summaries for these clients
-    const summaryMap = new Map<string, ClientTaskSummary>();
-    const ensureSummary = (clientId: string) => {
-      if (!summaryMap.has(clientId)) {
-        summaryMap.set(clientId, createTaskSummary());
-      }
-      return summaryMap.get(clientId)!;
-    };
-
-    if (clientIds.length) {
-      const statusCounts = await prisma.task.groupBy({
-        by: ["clientId", "status"],
-        where: { clientId: { in: clientIds } },
-        _count: { _all: true },
-      });
-
-      for (const row of statusCounts) {
-        const key = String(row.clientId);
-        const summary = ensureSummary(key);
-        const normalized = (row.status ?? "").toLowerCase();
-        const count = row._count._all;
-        summary.total += count;
-        switch (normalized) {
-          case "pending":
-            summary.pending += count;
-            break;
-          case "in_progress":
-          case "in-progress":
-            summary.in_progress += count;
-            break;
-          case "completed":
-            summary.completed += count;
-            break;
-          case "overdue":
-            summary.overdue += count;
-            break;
-          case "cancelled":
-          case "canceled":
-            summary.cancelled += count;
-            break;
-          case "reassigned":
-            summary.reassigned += count;
-            break;
-          default:
-            summary.pending += count;
-            break;
-        }
-      }
-
-      const monthStart = startOfMonth(new Date());
-      const monthEnd = addMonths(monthStart, 1);
-
-      const monthTotals = await prisma.task.groupBy({
-        by: ["clientId"],
-        where: {
-          clientId: { in: clientIds },
-          dueDate: { gte: monthStart, lt: monthEnd },
-        },
-        _count: { _all: true },
-      });
-      for (const row of monthTotals) {
-        ensureSummary(String(row.clientId)).thisMonth.total = row._count._all;
-      }
-
-      const monthCompleted = await prisma.task.groupBy({
-        by: ["clientId"],
-        where: {
-          clientId: { in: clientIds },
-          completedAt: { gte: monthStart, lt: monthEnd },
-        },
-        _count: { _all: true },
-      });
-      for (const row of monthCompleted) {
-        ensureSummary(String(row.clientId)).thisMonth.completed =
-          row._count._all;
-      }
-
-      const monthApproved = await prisma.task.groupBy({
-        by: ["clientId"],
-        where: {
-          clientId: { in: clientIds },
-          status: { in: ["qc_approved", "approved"] },
-          completedAt: { gte: monthStart, lt: monthEnd },
-        },
-        _count: { _all: true },
-      });
-      for (const row of monthApproved) {
-        ensureSummary(String(row.clientId)).thisMonth.approved =
-          row._count._all;
-      }
-    }
-
     const result = clients.map((c) => ({
       ...c,
       socialMedias: Array.isArray((c as any).socialMedia)
         ? ((c as any).socialMedia as any[])
         : [],
-      tasks: includeTasks ? c.tasks : [],
-      taskSummary: summaryMap.get(c.id) ?? createTaskSummary(),
       clientUserId: clientIdToUserId.get(c.id) ?? null,
     }));
 
