@@ -12,7 +12,7 @@ const BASE_AGENT_SELECT = {
   category: true,
   phone: true,
   address: true,
-  bio: true,
+  biography: true,
   status: true,
   createdAt: true,
   role: { select: { name: true } },
@@ -50,7 +50,14 @@ export async function GET(req: Request) {
       orderBy: [{ category: "asc" }, { name: "asc" }],
     });
 
-    return NextResponse.json(agents, {
+    // Transform the data to match frontend expectations (biography -> bio)
+    const transformedAgents = agents.map((agent) => ({
+      ...agent,
+      bio: agent.biography,
+      biography: undefined, // Remove the original field
+    }));
+
+    return NextResponse.json(transformedAgents, {
       headers: {
         "Cache-Control": "public, s-maxage=60, stale-while-revalidate=60",
       },

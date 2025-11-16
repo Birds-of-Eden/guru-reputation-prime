@@ -154,9 +154,9 @@ const normalizeArticleCategories = (input: unknown): ArticleCategory[] => {
                 usedDate = isNaN(d.getTime()) ? null : d.toISOString();
               }
 
-              return { 
-                title, 
-                draftLink, 
+              return {
+                title,
+                draftLink,
                 draftStatus,
                 status,
                 usedCount: usedCount ?? 0,
@@ -238,7 +238,7 @@ export async function GET(req: Request) {
         },
       },
       // Sort by recent first for better UX
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       // Limit to prevent overwhelming response (optional based on your needs)
       take: 1000,
     });
@@ -275,7 +275,7 @@ export async function GET(req: Request) {
     // Add cache headers for better performance (cache for 10 seconds, revalidate in background)
     return NextResponse.json(result, {
       headers: {
-        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+        "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30",
       },
     });
   } catch (error) {
@@ -325,7 +325,10 @@ export async function POST(req: NextRequest) {
 
     // Debug: Log received article data
     console.log("POST /api/clients - Received articleTopics:", articleTopics);
-    console.log("POST /api/clients - Received articleCategories:", articleCategories);
+    console.log(
+      "POST /api/clients - Received articleCategories:",
+      articleCategories
+    );
 
     // (Optional) enforce AM role server-side
     if (amId) {
@@ -425,13 +428,15 @@ export async function POST(req: NextRequest) {
 
           // Use articleTopics field for both old structure and new categories structure
           // Check both articleCategories and articleTopics parameters
-          articleTopics: articleCategories 
+          articleTopics: articleCategories
             ? normalizeArticleCategories(articleCategories)
-            : articleTopics && Array.isArray(articleTopics) && articleTopics.length > 0
-              ? (articleTopics[0] && 'category' in articleTopics[0] 
-                  ? normalizeArticleCategories(articleTopics)  // New structure in articleTopics
-                  : normalizeArticleTopics(articleTopics))     // Old structure in articleTopics
-              : undefined,
+            : articleTopics &&
+              Array.isArray(articleTopics) &&
+              articleTopics.length > 0
+            ? articleTopics[0] && "category" in articleTopics[0]
+              ? normalizeArticleCategories(articleTopics) // New structure in articleTopics
+              : normalizeArticleTopics(articleTopics) // Old structure in articleTopics
+            : undefined,
           amId: amId || undefined,
         } as any,
         include: {
@@ -441,7 +446,10 @@ export async function POST(req: NextRequest) {
 
       // Debug: Log saved client data
       console.log("POST /api/clients - Client created with ID:", client.id);
-      console.log("POST /api/clients - Saved articleTopics:", client.articleTopics);
+      console.log(
+        "POST /api/clients - Saved articleTopics:",
+        client.articleTopics
+      );
     } catch (err: any) {
       console.error(
         "POST /api/clients prisma create error:",
@@ -561,6 +569,16 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Missing client id" }, { status: 400 });
     }
 
+    // Check if client exists before attempting to update
+    const existingClient = await prisma.client.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!existingClient) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
     const body = await req.json();
     const {
       name,
@@ -622,9 +640,12 @@ export async function PUT(req: NextRequest) {
           articleCategories !== undefined
             ? (normalizeArticleCategories as any)(articleCategories)
             : articleTopics !== undefined
-            ? (Array.isArray(articleTopics) && articleTopics.length > 0 && (articleTopics as any)[0] && 'category' in (articleTopics as any)[0]
-                ? (normalizeArticleCategories as any)(articleTopics)
-                : normalizeArticleTopics(articleTopics))
+            ? Array.isArray(articleTopics) &&
+              articleTopics.length > 0 &&
+              (articleTopics as any)[0] &&
+              "category" in (articleTopics as any)[0]
+              ? (normalizeArticleCategories as any)(articleTopics)
+              : normalizeArticleTopics(articleTopics)
             : undefined,
         amId: amId ?? null,
       },
@@ -635,6 +656,24 @@ export async function PUT(req: NextRequest) {
 
     return NextResponse.json(updated);
   } catch (error) {
+    console.error("Error in PUT /api/clients:", error);
+
+    // Handle Prisma specific errors
+    if (error instanceof Error) {
+      if (error.message.includes("Record to update not found")) {
+        return NextResponse.json(
+          { error: "Client not found" },
+          { status: 404 }
+        );
+      }
+      if (error.message.includes("Unique constraint")) {
+        return NextResponse.json(
+          { error: "Email already exists" },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
@@ -659,6 +698,19 @@ export async function DELETE(req: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "Missing client id" }, { status: 400 });
+    }
+
+    // Check if client exists before attempting to delete
+    const existingClient = await prisma.client.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+
+    if (!existingClient) {
+      return NextResponse.json(
+        { error: "Client not found or already deleted" },
+        { status: 404 }
+      );
     }
 
     await prisma.$transaction(async (tx) => {
@@ -717,6 +769,24 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (error) {
+    console.error("Error in DELETE /api/clients:", error);
+
+    // Handle Prisma specific errors
+    if (error instanceof Error) {
+      if (error.message.includes("Record to delete does not exist")) {
+        return NextResponse.json(
+          { error: "Client not found or already deleted" },
+          { status: 404 }
+        );
+      }
+      if (error.message.includes("Foreign key constraint")) {
+        return NextResponse.json(
+          { error: "Cannot delete client with existing dependencies" },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }

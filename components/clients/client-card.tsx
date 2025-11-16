@@ -65,15 +65,6 @@ const ClientCardComponent = function ClientCard({
   const [openDanger, setOpenDanger] = useState(false);
   const [openUpgrade, setOpenUpgrade] = useState(false);
 
-  if (deleted) return null;
-  if (!client) {
-    return (
-      <Card className="p-6 text-center text-gray-500">
-        Invalid client data
-      </Card>
-    );
-  }
-
   // ⚡ OPTIMIZED: Memoize utility functions
   const normalizeStatus = useCallback((raw?: string | null) => {
     const s = (raw ?? "")
@@ -82,13 +73,31 @@ const ClientCardComponent = function ClientCard({
       .toLowerCase()
       .replace(/[\-\s]+/g, "_");
     if (
-      ["done", "complete", "completed", "finished", "qc_approved", "approved"].includes(s)
+      [
+        "done",
+        "complete",
+        "completed",
+        "finished",
+        "qc_approved",
+        "approved",
+      ].includes(s)
     )
       return "completed";
-    if (["in_progress", "in-progress", "progress", "doing", "working"].includes(s))
+    if (
+      ["in_progress", "in-progress", "progress", "doing", "working"].includes(s)
+    )
       return "in_progress";
     if (["overdue", "late"].includes(s)) return "overdue";
-    if (["pending", "todo", "not_started", "on_hold", "paused", "backlog"].includes(s))
+    if (
+      [
+        "pending",
+        "todo",
+        "not_started",
+        "on_hold",
+        "paused",
+        "backlog",
+      ].includes(s)
+    )
       return "pending";
     if (["cancelled", "canceled"].includes(s)) return "cancelled";
     return s || "pending";
@@ -119,9 +128,10 @@ const ClientCardComponent = function ClientCard({
   }, [client.tasks, normalizeStatus]);
 
   const totalTasks = client.tasks?.length || 0;
-  
+
   const derivedProgress = useMemo(
-    () => (totalTasks ? Math.round((taskCounts.completed / totalTasks) * 100) : 0),
+    () =>
+      totalTasks ? Math.round((taskCounts.completed / totalTasks) * 100) : 0,
     [totalTasks, taskCounts.completed]
   );
 
@@ -135,50 +145,59 @@ const ClientCardComponent = function ClientCard({
   }, []);
 
   // ⚡ OPTIMIZED: Memoize month progress calculation
-  const { derivedProgressThisMonth, completedThisMonth, totalThisMonth } = useMemo(() => {
-    const tasks = client.tasks ?? [];
-    
-    const getBestDate = (task: any): Date | null => {
-      return (
-        parseDate(task?.createdAt) ||
-        parseDate(task?.startDate) ||
-        parseDate(task?.dueDate)
-      );
-    };
+  const { derivedProgressThisMonth, completedThisMonth, totalThisMonth } =
+    useMemo(() => {
+      const tasks = client.tasks ?? [];
 
-    const inThisMonth = (task: any) => {
-      const d = getBestDate(task);
-      if (!d) return false;
-      return d >= monthStart && d < monthEnd;
-    };
+      const getBestDate = (task: any): Date | null => {
+        return (
+          parseDate(task?.createdAt) ||
+          parseDate(task?.startDate) ||
+          parseDate(task?.dueDate)
+        );
+      };
 
-    const tasksThisMonth = tasks.filter(inThisMonth);
-    const totalThisMonth = tasksThisMonth.length;
+      const inThisMonth = (task: any) => {
+        const d = getBestDate(task);
+        if (!d) return false;
+        return d >= monthStart && d < monthEnd;
+      };
 
-    let completedThisMonth = 0;
-    let approvedThisMonth = 0;
+      const tasksThisMonth = tasks.filter(inThisMonth);
+      const totalThisMonth = tasksThisMonth.length;
 
-    for (const t of tasksThisMonth) {
-      const sRaw = (t as any)?.status?.toString().trim().toLowerCase().replace(/[\-\s]+/g, "_") || "";
-      const sNorm = normalizeStatus((t as any)?.status);
-      const completedAt = parseDate((t as any)?.completedAt);
+      let completedThisMonth = 0;
+      let approvedThisMonth = 0;
 
-      const isCompleted =
-        (completedAt ? completedAt >= monthStart && completedAt < monthEnd : false) ||
-        sNorm === "completed";
+      for (const t of tasksThisMonth) {
+        const sRaw =
+          (t as any)?.status
+            ?.toString()
+            .trim()
+            .toLowerCase()
+            .replace(/[\-\s]+/g, "_") || "";
+        const sNorm = normalizeStatus((t as any)?.status);
+        const completedAt = parseDate((t as any)?.completedAt);
 
-      const isApproved = sRaw === "qc_approved" || sRaw === "approved";
+        const isCompleted =
+          (completedAt
+            ? completedAt >= monthStart && completedAt < monthEnd
+            : false) || sNorm === "completed";
 
-      if (isCompleted) completedThisMonth++;
-      if (isApproved) approvedThisMonth++;
-    }
+        const isApproved = sRaw === "qc_approved" || sRaw === "approved";
 
-    const derivedProgressThisMonth = totalThisMonth
-      ? Math.round(((completedThisMonth + approvedThisMonth) / totalThisMonth) * 100)
-      : 0;
+        if (isCompleted) completedThisMonth++;
+        if (isApproved) approvedThisMonth++;
+      }
 
-    return { derivedProgressThisMonth, completedThisMonth, totalThisMonth };
-  }, [client.tasks, monthStart, monthEnd, normalizeStatus, parseDate]);
+      const derivedProgressThisMonth = totalThisMonth
+        ? Math.round(
+            ((completedThisMonth + approvedThisMonth) / totalThisMonth) * 100
+          )
+        : 0;
+
+      return { derivedProgressThisMonth, completedThisMonth, totalThisMonth };
+    }, [client.tasks, monthStart, monthEnd, normalizeStatus, parseDate]);
 
   // ⚡ OPTIMIZED: Memoize date formatting
   const formatDate = useCallback(
@@ -198,11 +217,12 @@ const ClientCardComponent = function ClientCard({
   // ⚡ OPTIMIZED: Memoize role and segment
   const { role, segment } = useMemo(() => {
     const roleRaw = (user as any)?.role?.name ?? (user as any)?.role;
-    const role = typeof roleRaw === "string" ? roleRaw.toLowerCase() : undefined;
+    const role =
+      typeof roleRaw === "string" ? roleRaw.toLowerCase() : undefined;
     const segment = role && /^[a-z0-9_-]+$/.test(role) ? role : "admin";
     return { role, segment };
   }, [user]);
-  
+
   const swrKey = "/api/clients";
 
   // ⚡ OPTIMIZED: Memoize detail URL for prefetching
@@ -240,6 +260,14 @@ const ClientCardComponent = function ClientCard({
   const handleUpgrade = () => setOpenUpgrade(true);
   const isAmCeo = role === "am_ceo";
 
+  // Early returns after all hooks are called
+  if (deleted) return null;
+  if (!client) {
+    return (
+      <Card className="p-6 text-center text-gray-500">Invalid client data</Card>
+    );
+  }
+
   return (
     <Card className="overflow-hidden rounded-xl shadow-lg border border-gray-100 transition-all duration-300 hover:shadow-xl hover:scale-[1.01] bg-white">
       {/* Header */}
@@ -276,7 +304,11 @@ const ClientCardComponent = function ClientCard({
                           : "bg-white border-gray-200 text-gray-500 hover:text-gray-700"
                       }`}
                     >
-                      <Heart className={`h-5 w-5 ${isFavorite ? "fill-current" : ""}`} />
+                      <Heart
+                        className={`h-5 w-5 ${
+                          isFavorite ? "fill-current" : ""
+                        }`}
+                      />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
@@ -328,7 +360,9 @@ const ClientCardComponent = function ClientCard({
           <div className="grid grid-cols-2 gap-y-2 text-sm">
             <div className="text-gray-600">Start Date:</div>
             <div className="font-medium text-gray-800">
-              {formatDate((client as any)?.startDate || (client as any)?.createdAt)}
+              {formatDate(
+                (client as any)?.startDate || (client as any)?.createdAt
+              )}
             </div>
 
             <div className="text-gray-600">End Date:</div>
@@ -412,7 +446,10 @@ const ClientCardComponent = function ClientCard({
       <CardFooter className="border-t border-gray-100 bg-gray-50 p-6">
         <div className="flex flex-wrap gap-3 w-full">
           {!permsLoading &&
-            hasPermissionClient(user?.permissions, "client_card_client_view") && (
+            hasPermissionClient(
+              user?.permissions,
+              "client_card_client_view"
+            ) && (
               <Button
                 asChild
                 className="flex-1 min-w-[150px] bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md rounded-lg px-5 py-2.5 transition-all duration-300"
@@ -424,7 +461,10 @@ const ClientCardComponent = function ClientCard({
             )}
 
           {!permsLoading &&
-            hasPermissionClient(user?.permissions, "client_card_Upgrade_Package") && (
+            hasPermissionClient(
+              user?.permissions,
+              "client_card_Upgrade_Package"
+            ) && (
               <Button
                 onClick={handleUpgrade}
                 className="flex-1 min-w-[150px] bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-md rounded-lg px-5 py-2.5 transition-all duration-300"
