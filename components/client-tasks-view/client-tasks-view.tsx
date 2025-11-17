@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useDeferredValue } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,12 +26,45 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ClientDashboard } from "@/components/clients/clientsID/client-dashboard";
 import { Client } from "@/types/client";
 
 import TaskList from "@/components/client-tasks-view/TaskList";
 import TaskDialogs from "@/components/client-tasks-view/TaskDialogs";
 import { BackgroundGradient } from "../ui/background-gradient";
+import { lazy, Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const ClientDashboard = lazy(() =>
+  import("@/components/clients/clientsID/client-dashboard").then((m) => ({
+    default: m.ClientDashboard,
+  }))
+);
+
+const ClientDashboardSkeleton = () => (
+  <div className="space-y-4">
+    <div className="flex items-center justify-between">
+      <Skeleton className="h-6 w-48" />
+      <Skeleton className="h-8 w-24 rounded-md" />
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <Card key={i} className="border border-muted/40">
+          <CardHeader>
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-16" />
+            <Skeleton className="h-3 w-32" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+    <div className="space-y-2">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="h-40 w-full rounded-xl" />
+    </div>
+  </div>
+);
 
 /* =========================
    Types exported for children
@@ -269,6 +302,7 @@ export function ClientTasksView({
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const deferredSearch = useDeferredValue(searchTerm.trim().toLowerCase());
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const [globalTimerLock, setGlobalTimerLock] = useState<GlobalTimerLock>({
@@ -1007,25 +1041,27 @@ export function ClientTasksView({
     setBulkCompletionLink("");
   }, []);
 
-  const filteredTasks = tasks
-    .filter((task) => {
-      const matchesSearch =
-        task.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.category?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        task.templateSiteAsset?.name
-          ?.toLowerCase()
-          .includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all" || task.status === statusFilter;
-      const matchesPriority =
-        priorityFilter === "all" || task.priority === priorityFilter;
-      return matchesSearch && matchesStatus && matchesPriority;
-    })
-    .sort((a, b) => {
-      if (a.status === "reassigned" && b.status !== "reassigned") return -1;
-      if (b.status === "reassigned" && a.status !== "reassigned") return 1;
-      return 0;
-    });
+  const filteredTasks = useMemo(() => {
+    const needle = deferredSearch;
+    return tasks
+      .filter((task) => {
+        const matchesSearch =
+          needle.length === 0 ||
+          task.name.toLowerCase().includes(needle) ||
+          task.category?.name?.toLowerCase().includes(needle) ||
+          task.templateSiteAsset?.name?.toLowerCase().includes(needle);
+        const matchesStatus =
+          statusFilter === "all" || task.status === statusFilter;
+        const matchesPriority =
+          priorityFilter === "all" || task.priority === priorityFilter;
+        return matchesSearch && matchesStatus && matchesPriority;
+      })
+      .sort((a, b) => {
+        if (a.status === "reassigned" && b.status !== "reassigned") return -1;
+        if (b.status === "reassigned" && a.status !== "reassigned") return 1;
+        return 0;
+      });
+  }, [deferredSearch, priorityFilter, statusFilter, tasks]);
 
   // ✅ Overdue count = strictly status-based
   const overdueCount = tasks.filter((task) => task.status === "overdue").length;
@@ -1291,7 +1327,9 @@ export function ClientTasksView({
                 </DialogHeader>
 
                 {clientData ? (
-                  <ClientDashboard clientData={clientData} />
+                  <Suspense fallback={<ClientDashboardSkeleton />}>
+                    <ClientDashboard clientData={clientData} />
+                  </Suspense>
                 ) : (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     Loading client info...

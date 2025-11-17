@@ -2,7 +2,15 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useDeferredValue,
+  lazy,
+  Suspense,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +48,12 @@ import {
   Globe,
   ExternalLink,
 } from "lucide-react";
+// Lazy-load heavy client task view to keep dashboard bundle lean
+const ClientTasksView = lazy(() =>
+  import("@/components/client-tasks-view/client-tasks-view").then((m) => ({
+    default: m.ClientTasksView,
+  }))
+);
 
 //
 // ---------- Types ----------
@@ -157,6 +171,7 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
   // State Management
   const [clients, setClients] = useState<ClientData[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const deferredSearch = useDeferredValue(searchTerm.trim().toLowerCase());
   const [statusFilter, setStatusFilter] = useState("all");
   const [progressFilter, setProgressFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -174,6 +189,8 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
   });
 
   const EXCLUDED_CATEGORIES = ["Social Communication"];
+  const PAGE_SIZE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   // Preselect from query params
   useEffect(() => {
@@ -186,7 +203,7 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
   }, [searchParams]);
 
   // API Functions
-  const fetchClients = useCallback(async () => {
+  const fetchClients = useCallback(async (signal?: AbortSignal) => {
     if (!agentId) return;
 
     setLoading(true);
@@ -197,7 +214,8 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
       params.set("excludeCategories", EXCLUDED_CATEGORIES.join(","));
 
       const response = await fetch(
-        `/api/tasks/clients/agents/${agentId}?${params.toString()}`
+        `/api/tasks/clients/agents/${agentId}?${params.toString()}`,
+        { cache: "no-store", signal }
       );
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -216,14 +234,16 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
         };
       });
 
-      setClients(normalized);
+      if (!signal?.aborted) setClients(normalized);
     } catch (err: any) {
       const errorMessage = err.message || "Failed to fetch clients.";
-      setError(errorMessage);
-      console.error("Failed to fetch clients:", err);
-      toast.error(errorMessage, { description: "Error fetching clients" });
+      if (!signal?.aborted) {
+        setError(errorMessage);
+        console.error("Failed to fetch clients:", err);
+        toast.error(errorMessage, { description: "Error fetching clients" });
+      }
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, [agentId]);
 
@@ -245,25 +265,36 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
   }, [router]);
 
   // Computed Values
-  const filteredClients = clients.filter((client) => {
-    const matchesSearch =
-      client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (client.company ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredClients = useMemo(() => {
+    const needle = deferredSearch;
+    return clients.filter((client) => {
+      const matchesSearch =
+        needle.length === 0 ||
+        client.name.toLowerCase().includes(needle) ||
+        (client.company ?? "").toLowerCase().includes(needle);
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      (client.status ?? "").toLowerCase() === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" ||
+        (client.status ?? "").toLowerCase() === statusFilter;
 
-    const matchesProgress =
-      progressFilter === "all" ||
-      (progressFilter === "completed" && client.progress === 100) ||
-      (progressFilter === "in_progress" &&
-        client.progress > 0 &&
-        client.progress < 100) ||
-      (progressFilter === "not_started" && client.progress === 0);
+      const matchesProgress =
+        progressFilter === "all" ||
+        (progressFilter === "completed" && client.progress === 100) ||
+        (progressFilter === "in_progress" &&
+          client.progress > 0 &&
+          client.progress < 100) ||
+        (progressFilter === "not_started" && client.progress === 0);
 
-    return matchesSearch && matchesStatus && matchesProgress;
-  });
+      return matchesSearch && matchesStatus && matchesProgress;
+    });
+  }, [clients, deferredSearch, progressFilter, statusFilter]);
+
+  const visibleClients = useMemo(
+    () => filteredClients.slice(0, visibleCount),
+    [filteredClients, visibleCount]
+  );
+  const filteredCount = filteredClients.length;
+  const hasMore = filteredCount > visibleCount;
 
   // Overall stats (aggregate including new fields)
   const totalStats = useMemo(() => {
@@ -300,11 +331,17 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
       ? Math.round((totalStats.completed / totalStats.totalTasks) * 100)
       : 0;
 
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [deferredSearch, progressFilter, statusFilter, clients.length]);
+
   // Effects
   useEffect(() => {
+    const controller = new AbortController();
     if (agentId) {
-      fetchClients();
+      fetchClients(controller.signal);
     }
+    return () => controller.abort();
   }, [agentId, fetchClients]);
 
   useEffect(() => {
@@ -351,19 +388,30 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
 
   // If viewing client tasks, route to detail component (unchanged)
   if (selectedClient) {
-    const ClientTasksView =
-      require("@/components/client-tasks-view/client-tasks-view").ClientTasksView;
     return (
-      <ClientTasksView
-        clientId={selectedClient.id}
-        clientName={selectedClient.name}
-        agentId={agentId!}
-        onBack={handleBackToClients}
-        isLockedBySelf={isLockedBySelf}
-        lockedTaskId={globalTimerLock.taskId}
-        lockedTaskName={globalTimerLock.taskName}
-        excludedCategories={EXCLUDED_CATEGORIES} // ⬅️ add this prop in that component
-      />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Loading client tasks...
+              </p>
+            </div>
+          </div>
+        }
+      >
+        <ClientTasksView
+          clientId={selectedClient.id}
+          clientName={selectedClient.name}
+          agentId={agentId!}
+          onBack={handleBackToClients}
+          isLockedBySelf={isLockedBySelf}
+          lockedTaskId={globalTimerLock.taskId}
+          lockedTaskName={globalTimerLock.taskName}
+          excludedCategories={EXCLUDED_CATEGORIES} // ?? add this prop in that component
+        />
+      </Suspense>
     );
   }
 
@@ -583,10 +631,10 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
           {/* Clients Display */}
           {viewMode === "card" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {filteredClients.length === 0 ? (
+              {filteredCount === 0 ? (
                 <EmptyClients />
               ) : (
-                filteredClients.map((client) => {
+                visibleClients.map((client) => {
                   const counts = pickCounts(client);
                   return (
                     <Card
@@ -774,14 +822,14 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredClients.length === 0 ? (
+                    {filteredCount === 0 ? (
                       <tr>
                         <td colSpan={6} className="text-center py-12">
                           <EmptyClients />
                         </td>
                       </tr>
                     ) : (
-                      filteredClients.map((client) => {
+                      visibleClients.map((client) => {
                         const c = pickCounts(client);
                         return (
                           <tr
@@ -913,19 +961,39 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
           )}
 
           {/* Results Summary */}
-          {filteredClients.length > 0 && (
+          {filteredCount > 0 && (
             <div className="flex items-center justify-between pt-6 mt-6 border-t border-gray-100 dark:border-gray-800">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Showing{" "}
                 <span className="font-semibold text-gray-900 dark:text-gray-50">
-                  {filteredClients.length}
+                  {Math.min(visibleCount, filteredCount)}
                 </span>{" "}
                 of{" "}
                 <span className="font-semibold text-gray-900 dark:text-gray-50">
-                  {clients.length}
+                  {filteredCount}
                 </span>{" "}
-                clients
+                matched clients
               </p>
+              <div className="flex items-center gap-2">
+                {hasMore && (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setVisibleCount((c) => Math.min(filteredCount, c + PAGE_SIZE))
+                    }
+                  >
+                    Load more
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    window.scrollTo({ top: 0, behavior: "smooth" })
+                  }
+                >
+                  Back to top
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
