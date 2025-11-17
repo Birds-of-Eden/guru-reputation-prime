@@ -203,49 +203,52 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
   }, [searchParams]);
 
   // API Functions
-  const fetchClients = useCallback(async (signal?: AbortSignal) => {
-    if (!agentId) return;
+  const fetchClients = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!agentId) return;
 
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      // backend will parse CSV
-      params.set("excludeCategories", EXCLUDED_CATEGORIES.join(","));
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        // backend will parse CSV
+        params.set("excludeCategories", EXCLUDED_CATEGORIES.join(","));
 
-      const response = await fetch(
-        `/api/tasks/clients/agents/${agentId}?${params.toString()}`,
-        { cache: "no-store", signal }
-      );
-      if (!response.ok)
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const response = await fetch(
+          `/api/tasks/clients/agents/${agentId}?${params.toString()}`,
+          { cache: "no-store", signal }
+        );
+        if (!response.ok)
+          throw new Error(`HTTP error! status: ${response.status}`);
 
-      const data: ClientData[] = await response.json();
+        const data: ClientData[] = await response.json();
 
-      // as-is: normalize
-      const normalized = data.map((client) => {
-        const counts = pickCounts(client);
-        const progress = pickProgress(client);
-        return {
-          ...client,
-          progress,
-          taskCounts: counts,
-          agentTaskCounts: undefined,
-        };
-      });
+        // as-is: normalize
+        const normalized = data.map((client) => {
+          const counts = pickCounts(client);
+          const progress = pickProgress(client);
+          return {
+            ...client,
+            progress,
+            taskCounts: counts,
+            agentTaskCounts: undefined,
+          };
+        });
 
-      if (!signal?.aborted) setClients(normalized);
-    } catch (err: any) {
-      const errorMessage = err.message || "Failed to fetch clients.";
-      if (!signal?.aborted) {
-        setError(errorMessage);
-        console.error("Failed to fetch clients:", err);
-        toast.error(errorMessage, { description: "Error fetching clients" });
+        if (!signal?.aborted) setClients(normalized);
+      } catch (err: any) {
+        const errorMessage = err.message || "Failed to fetch clients.";
+        if (!signal?.aborted) {
+          setError(errorMessage);
+          console.error("Failed to fetch clients:", err);
+          toast.error(errorMessage, { description: "Error fetching clients" });
+        }
+      } finally {
+        if (!signal?.aborted) setLoading(false);
       }
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, [agentId]);
+    },
+    [agentId]
+  );
 
   // Event Handlers
   const handleViewTasks = useCallback(
@@ -496,50 +499,42 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
           title="Total Clients"
           value={totalStats.totalClients}
           icon={<Activity className="h-5 w-5" />}
-          gradient="from-blue-500 to-blue-600"
         />
         <StatCard
           title="Total Tasks"
           value={totalStats.totalTasks}
           subtitle={`${overallCompletionRate}% completion rate`}
           icon={<CheckCircle className="h-5 w-5" />}
-          gradient="from-emerald-500 to-emerald-600"
         />
         <StatCard
           title="In Progress"
           value={totalStats.in_progress}
           icon={<Play className="h-5 w-5" />}
-          gradient="from-amber-500 to-amber-600"
         />
         <StatCard
           title="Overdue"
           value={totalStats.overdue}
           icon={<AlertCircle className="h-5 w-5" />}
-          gradient="from-red-500 to-red-600"
         />
         <StatCard
           title="Completed"
           value={totalStats.completed}
           icon={<CheckCheck className="h-5 w-5" />}
-          gradient="from-emerald-600 to-teal-600"
         />
         <StatCard
           title="Pending"
           value={totalStats.pending}
           icon={<Activity className="h-5 w-5" />}
-          gradient="from-indigo-500 to-indigo-600"
         />
         <StatCard
           title="Reassigned"
           value={totalStats.reassigned}
           icon={<RotateCcw className="h-5 w-5" />}
-          gradient="from-fuchsia-500 to-pink-600"
         />
         <StatCard
           title="QC Approved"
           value={totalStats.qc_approved}
           icon={<CheckCircle className="h-5 w-5" />}
-          gradient="from-cyan-500 to-sky-600"
         />
       </div>
 
@@ -979,7 +974,9 @@ export default function AgentDashboard({ agentId }: AgentDashboardProps) {
                   <Button
                     variant="outline"
                     onClick={() =>
-                      setVisibleCount((c) => Math.min(filteredCount, c + PAGE_SIZE))
+                      setVisibleCount((c) =>
+                        Math.min(filteredCount, c + PAGE_SIZE)
+                      )
                     }
                   >
                     Load more
@@ -1010,32 +1007,52 @@ function StatCard({
   value,
   subtitle,
   icon,
-  gradient,
 }: {
   title: string;
   value: number;
   subtitle?: string;
   icon: React.ReactNode;
-  gradient: string;
 }) {
   return (
     <Card
-      className={classNames(
-        "relative overflow-hidden border-0 shadow-lg text-white",
-        `bg-gradient-to-br ${gradient}`
-      )}
+      className="
+        bg-white 
+        border border-gray-200 
+        rounded-xl 
+        shadow-[0_2px_8px_rgba(0,0,0,0.04)]
+        hover:shadow-[0_4px_14px_rgba(0,0,0,0.08)]
+        transition-all duration-300 
+        p-6
+      "
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-      <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-white/90">
-          {title}
-        </CardTitle>
-        <div className="p-2 bg-white/20 rounded-lg">{icon}</div>
-      </CardHeader>
-      <CardContent className="relative">
-        <div className="text-3xl font-bold text-white">{value}</div>
-        {subtitle && <p className="text-xs text-white/90 mt-1">{subtitle}</p>}
-      </CardContent>
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col">
+          <span className="text-sm text-gray-600 font-semibold tracking-wide">
+            {title}
+          </span>
+
+          <span className="mt-2 text-4xl font-bold text-gray-900 leading-tight">
+            {value}
+          </span>
+
+          {subtitle && (
+            <span className="text-xs mt-1 text-gray-500">{subtitle}</span>
+          )}
+        </div>
+
+        <div
+          className="
+            w-12 h-12 
+            flex items-center justify-center
+            rounded-xl 
+            bg-gray-100 
+            border border-gray-200
+            text-gray-700
+          "
+        >
+          {icon}
+        </div>
+      </div>
     </Card>
   );
 }
