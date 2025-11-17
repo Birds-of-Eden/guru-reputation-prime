@@ -38,7 +38,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// ---------- Normalized status counts (snake_case) ----------
+// ---------- Types & helpers (aligned with API route) ----------
+
 type StatusCounts = {
   total: number;
   pending: number;
@@ -75,45 +76,51 @@ function normalizeCounts(input?: Partial<StatusCounts> | null): StatusCounts {
   };
 }
 
-// ---------- Types from API (aligned with updated route) ----------
-interface AgentTask {
-  id: string;
-  name: string;
-  status:
-    | "pending"
-    | "in_progress"
-    | "completed"
-    | "overdue"
-    | "cancelled"
-    | "reassigned"
-    | "qc_approved";
-  priority: "low" | "medium" | "high" | "urgent";
-  dueDate: string | null;
-  completedAt: string | null;
-  createdAt: string;
-  templateSiteAsset?: {
-    id: number;
-    name: string;
-    url: string | null;
-  } | null;
-}
+type PriorityCounts = {
+  low: number;
+  medium: number;
+  high: number;
+  urgent: number;
+};
 
+const EMPTY_PRIORITY_COUNTS: PriorityCounts = {
+  low: 0,
+  medium: 0,
+  high: 0,
+  urgent: 0,
+};
+
+// ---- API payload type (same as route.ts) ----
 interface AgentClient {
   id: string;
   name: string;
-  email?: string | null;
-  phone?: string | null;
+  company?: string | null;
+  designation?: string | null;
+  avatar?: string | null;
   status: string | null;
-  // DB overall progress (may be null/undefined; we’ll compute a safe number)
-  progress?: number | null;
-  // Agent-specific progress (may be missing; we’ll compute a safe number)
-  agentProgress?: number | null;
-  // The route may return either agentTaskCounts or taskCounts; we’ll use whichever exists
-  agentTaskCounts?: Partial<StatusCounts> | null;
-  taskCounts?: Partial<StatusCounts> | null;
+  imageDrivelink?: string | null;
   package?: { id: string; name: string } | null;
-  tasks?: AgentTask[];
-  createdAt?: string;
+
+  progress?: number | null;
+  taskCounts?: Partial<StatusCounts> | null;
+  agentTaskCounts?: Partial<StatusCounts> | null;
+  priorityCounts?: PriorityCounts | null;
+
+  credentials?: {
+    email: string | null;
+    username: string | null;
+    password: string | null;
+  };
+  completionLink?: string | null;
+  asset?: string | null;
+  assetUrl?: string | null;
+  url?: string | null;
+  siteAsset?: {
+    id: number;
+    name: string;
+    url: string | null;
+    type: string;
+  } | null;
 }
 
 interface AgentDashboardData {
@@ -123,127 +130,144 @@ interface AgentDashboardData {
   pendingTasks: number;
   inProgressTasks: number;
   reassignedTasks: number;
+  qcApprovedTasks: number; // NEW: overall QC approved count
   overallCompletionRate: number;
   averageClientProgress: number;
   recentClients: (AgentClient & {
     _counts: StatusCounts;
-    _agentProgress: number;
+    _agentProgress: number; // overall progress
+    _qcProgress: number; // NEW: qc_approved ভিত্তিক progress
   })[];
-  recentTasks: AgentTask[];
-  highPriorityTasks: AgentTask[];
   clientsNeedingAttention: (AgentClient & {
     _counts: StatusCounts;
     _agentProgress: number;
+    _qcProgress: number;
   })[];
+  highPrioritySummary: {
+    clientId: string;
+    clientName: string;
+    high: number;
+    urgent: number;
+  }[];
 }
 
 interface AgentDashboardProps {
   agentId: string;
 }
 
-// Fetcher for agent dashboard
+// Fetcher
 const agentDashboardFetcher = async (url: string): Promise<AgentClient[]> => {
   const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) throw new Error(`Failed to fetch agent data: ${response.statusText}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch agent data: ${response.statusText}`);
+  }
   return response.json();
 };
 
 export function AgentDashboard({ agentId }: AgentDashboardProps) {
-  const [timeRange, setTimeRange] = useState("month");
-  
-  // ✅ Use SWR for agent dashboard data
-  const { data: rawClients, isLoading: loading, error: fetchError } = useSWR<AgentClient[]>(
+  const [timeRange, setTimeRange] = useState("month"); // UI only
+
+  const {
+    data: rawClients,
+    isLoading: loading,
+    error: fetchError,
+  } = useSWR<AgentClient[]>(
     agentId ? `/api/tasks/clients/agents/${agentId}` : null,
     agentDashboardFetcher,
     {
       revalidateOnFocus: false,
       dedupingInterval: 30000,
-      refreshInterval: 60000, // Auto-refresh every 1 min
+      refreshInterval: 60000,
     }
   );
-  
-  const error = fetchError ? (fetchError instanceof Error ? fetchError.message : "Failed to fetch dashboard data") : null;
-  
-  // ✅ Process dashboard data with useMemo
-  const dashboardData = useMemo(() => {
+
+  const error = fetchError
+    ? fetchError instanceof Error
+      ? fetchError.message
+      : "Failed to fetch dashboard data"
+    : null;
+
+  const dashboardData: AgentDashboardData | null = useMemo(() => {
     if (!rawClients) return null;
-    
+
     try {
-      // Normalize counts + progress per client
       const clients = rawClients.map((c) => {
-          const counts = normalizeCounts(
-            c.agentTaskCounts ?? c.taskCounts ?? EMPTY_COUNTS
-          );
-          const derivedProgress =
-            typeof c.agentProgress === "number"
-              ? c.agentProgress
-              : counts.total > 0
-              ? Math.round((counts.completed / counts.total) * 100)
-              : 0;
+        const counts = normalizeCounts(c.agentTaskCounts ?? c.taskCounts ?? EMPTY_COUNTS);
 
-          return {
-            ...c,
-            _counts: counts,
-            _agentProgress: derivedProgress,
-            tasks: c.tasks ?? [],
-          };
-        });
+        // overall completion (completed / total)
+        const derivedFromCounts =
+          counts.total > 0
+            ? Math.round((counts.completed / counts.total) * 100)
+            : 0;
 
-        // Aggregate totals
-        let totalTasks = 0;
-        let completedTasks = 0;
-        let pendingTasks = 0;
-        let inProgressTasks = 0;
-        let reassignedTasks = 0;
-        let totalProgress = 0;
+        // ✅ QC-based progress (qc_approved / total)
+        const qcProgress =
+          counts.total > 0
+            ? Math.round((counts.qc_approved / counts.total) * 100)
+            : 0;
 
-        const allTasks: AgentTask[] = [];
-        const clientsNeedingAttention: typeof clients = [];
+        const finalProgress =
+          typeof c.progress === "number" ? c.progress : derivedFromCounts;
 
-        clients.forEach((client) => {
-          totalTasks += client._counts.total;
-          completedTasks += client._counts.completed;
-          pendingTasks += client._counts.pending;
-          inProgressTasks += client._counts.in_progress;
-          reassignedTasks += client._counts.reassigned;
-          totalProgress += client._agentProgress;
+        return {
+          ...c,
+          _counts: counts,
+          _agentProgress: finalProgress, // existing overall progress
+          _qcProgress: qcProgress, // NEW: qc-based progress
+        };
+      });
 
-          allTasks.push(...(client.tasks ?? []));
+      let totalTasks = 0;
+      let completedTasks = 0;
+      let pendingTasks = 0;
+      let inProgressTasks = 0;
+      let reassignedTasks = 0;
+      let qcApprovedTasks = 0; // NEW
+      let totalProgress = 0;
 
-          const hasOverdue = (client.tasks ?? []).some(
-            (t) =>
-              t.dueDate && new Date(t.dueDate) < new Date() && !t.completedAt
-          );
-          if (client._agentProgress < 30 || hasOverdue) {
-            clientsNeedingAttention.push(client);
-          }
-        });
+      const clientsNeedingAttention: typeof clients = [];
+      const highPrioritySummaryMap = new Map<
+        string,
+        { clientId: string; clientName: string; high: number; urgent: number }
+      >();
 
-        // Sort + slice tasks for widgets
-        const recentTasks = [...allTasks]
-          .sort(
-            (a, b) =>
-              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          )
-          .slice(0, 5);
+      clients.forEach((client) => {
+        const counts = client._counts;
 
-        const highPriorityTasks = allTasks
-          .filter((t) => t.priority === "high" && !t.completedAt) // ✅ enum is lowercase
-          .sort((a, b) => {
-            const ad = a.dueDate
-              ? new Date(a.dueDate).getTime()
-              : Number.MAX_SAFE_INTEGER;
-            const bd = b.dueDate
-              ? new Date(b.dueDate).getTime()
-              : Number.MAX_SAFE_INTEGER;
-            return ad - bd;
-          })
-          .slice(0, 5);
+        totalTasks += counts.total;
+        completedTasks += counts.completed;
+        pendingTasks += counts.pending;
+        inProgressTasks += counts.in_progress;
+        reassignedTasks += counts.reassigned;
+        qcApprovedTasks += counts.qc_approved; // NEW
+        totalProgress += client._agentProgress;
 
-        const overallCompletionRate =
-          totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-        const averageClientProgress =
-          clients.length > 0 ? Math.round(totalProgress / clients.length) : 0;
+        const hasOverdue = counts.overdue > 0;
+
+        // ✅ attention criteria e ekhono offline progress r overdue diteitese,
+        // chaile _qcProgress diye o korar scope ache
+        if (client._qcProgress < 30 || hasOverdue) {
+          clientsNeedingAttention.push(client);
+        }
+
+        const pCounts = client.priorityCounts ?? EMPTY_PRIORITY_COUNTS;
+        if (pCounts.high > 0 || pCounts.urgent > 0) {
+          highPrioritySummaryMap.set(client.id, {
+            clientId: client.id,
+            clientName: client.name,
+            high: pCounts.high,
+            urgent: pCounts.urgent,
+          });
+        }
+      });
+
+      const overallCompletionRate =
+        totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+      const averageClientProgress =
+        clients.length > 0 ? Math.round(totalProgress / clients.length) : 0;
+
+      const highPrioritySummary = Array.from(highPrioritySummaryMap.values());
 
       return {
         totalAssignedClients: clients.length,
@@ -252,12 +276,12 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
         pendingTasks,
         inProgressTasks,
         reassignedTasks,
+        qcApprovedTasks,
         overallCompletionRate,
         averageClientProgress,
         recentClients: clients.slice(0, 5),
-        recentTasks,
-        highPriorityTasks,
         clientsNeedingAttention: clientsNeedingAttention.slice(0, 5),
+        highPrioritySummary,
       };
     } catch (e) {
       console.error("Error processing agent dashboard data:", e);
@@ -289,9 +313,10 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
 
   return (
     <div className="space-y-8 p-6 bg-gradient-to-br from-slate-50 to-blue-50 min-h-screen">
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent">
+          <h2 className="text-4xl font-bold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent pa-3">
             Agent Performance Dashboard
           </h2>
           <p className="text-muted-foreground mt-2">
@@ -317,7 +342,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
               Performance Summary
             </Button>
           </div>
-          <Select defaultValue={timeRange} onValueChange={setTimeRange}>
+          <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-full sm:w-[180px] border-slate-300">
               <SelectValue placeholder="Select time range" />
             </SelectTrigger>
@@ -373,6 +398,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
 
       {/* Middle section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Task Status Overview */}
         <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-gradient-to-br from-white to-blue-50/50 backdrop-blur-sm">
           <CardHeader className="border-b border-slate-200/70 py-5 bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
             <div className="flex justify-between items-center">
@@ -396,12 +422,19 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-5">
+                <BarRow
+                label="QC Approved"
+                value={dashboardData?.qcApprovedTasks ?? 0}
+                total={dashboardData?.totalTasks ?? 0}
+                barClass="bg-indigo-500" // NEW colour for QC
+              />
               <BarRow
                 label="Completed"
                 value={dashboardData?.completedTasks ?? 0}
                 total={dashboardData?.totalTasks ?? 0}
                 barClass="bg-emerald-500"
               />
+            
               <BarRow
                 label="In Progress"
                 value={dashboardData?.inProgressTasks ?? 0}
@@ -424,6 +457,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
           </CardContent>
         </Card>
 
+        {/* Client Progress Distribution (QC-based) */}
         <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-gradient-to-br from-white to-purple-50/50 backdrop-blur-sm">
           <CardHeader className="border-b border-slate-200/70 py-5 bg-gradient-to-r from-purple-50/50 to-violet-50/50">
             <div className="flex justify-between items-center">
@@ -433,7 +467,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
                   Client Progress Distribution
                 </CardTitle>
                 <CardDescription className="text-slate-500">
-                  Progress across assigned clients
+                  QC approved progress across clients
                 </CardDescription>
               </div>
               <Button
@@ -456,11 +490,11 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
                         {client.name}
                       </span>
                       <span className="text-sm text-slate-500">
-                        {client._agentProgress}% complete
+                        {client._qcProgress}% QC approved
                       </span>
                     </div>
                     <Progress
-                      value={client._agentProgress}
+                      value={client._qcProgress}
                       className="h-2 bg-slate-200 [&>div]:bg-gradient-to-r [&>div]:from-purple-500 [&>div]:to-violet-500 [&>div]:rounded-full"
                     />
                   </div>
@@ -472,6 +506,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
 
       {/* Bottom section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Assigned Clients (QC-based progress) */}
         <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-gradient-to-br from-white to-slate-50/50 backdrop-blur-sm">
           <CardHeader className="border-b border-slate-200/70 py-5 bg-gradient-to-r from-slate-50/50 to-slate-100/50">
             <div className="flex justify-between items-center">
@@ -481,7 +516,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
                   Assigned Clients
                 </CardTitle>
                 <CardDescription className="text-slate-500">
-                  Your current client assignments
+                  QC approval status per client
                 </CardDescription>
               </div>
               <Button
@@ -525,9 +560,9 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
                     <div className="flex items-center gap-2">
                       <div className="text-right">
                         <p className="text-sm font-medium text-slate-700">
-                          {client._agentProgress}%
+                          {client._qcProgress}%
                         </p>
-                        <p className="text-xs text-slate-500">progress</p>
+                        <p className="text-xs text-slate-500">QC approved</p>
                       </div>
                       <Badge variant="outline" className={badgeCls}>
                         {client.status || "unknown"}
@@ -540,6 +575,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
           </CardContent>
         </Card>
 
+        {/* High Priority Summary (same as before) */}
         <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-gradient-to-br from-white to-slate-50/50 backdrop-blur-sm">
           <CardHeader className="border-b border-slate-200/70 py-5 bg-gradient-to-r from-slate-50/50 to-slate-100/50">
             <div className="flex justify-between items-center">
@@ -549,7 +585,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
                   High Priority Tasks
                 </CardTitle>
                 <CardDescription className="text-slate-500">
-                  Tasks requiring immediate attention
+                  Clients with high/urgent workload
                 </CardDescription>
               </div>
               <Button
@@ -563,7 +599,7 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
           </CardHeader>
           <CardContent className="p-5">
             <div className="space-y-4">
-              {(dashboardData?.highPriorityTasks ?? []).length === 0 ? (
+              {(dashboardData?.highPrioritySummary ?? []).length === 0 ? (
                 <div className="text-center py-8">
                   <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto mb-3" />
                   <p className="text-sm text-slate-600">
@@ -574,24 +610,22 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
                   </p>
                 </div>
               ) : (
-                (dashboardData?.highPriorityTasks ?? []).map((task) => {
-                  const isOverdue = task.dueDate
-                    ? new Date(task.dueDate) < new Date()
-                    : false;
+                (dashboardData?.highPrioritySummary ?? []).map((item) => {
+                  const hasUrgent = item.urgent > 0;
                   return (
                     <div
-                      key={task.id}
+                      key={item.clientId}
                       className="flex items-center justify-between p-3 rounded-lg transition-all duration-200 hover:bg-slate-100/50"
                     >
                       <div className="flex items-center gap-3">
                         <div
                           className={`h-10 w-10 rounded-full flex items-center justify-center shadow-sm ${
-                            isOverdue
+                            hasUrgent
                               ? "bg-red-100 text-red-600"
                               : "bg-orange-100 text-orange-600"
                           }`}
                         >
-                          {isOverdue ? (
+                          {hasUrgent ? (
                             <AlertCircle className="h-5 w-5" />
                           ) : (
                             <Clock className="h-5 w-5" />
@@ -599,25 +633,22 @@ export function AgentDashboard({ agentId }: AgentDashboardProps) {
                         </div>
                         <div>
                           <p className="font-medium text-slate-800">
-                            {task.name}
+                            {item.clientName}
                           </p>
                           <p className="text-xs text-slate-500">
-                            Due:{" "}
-                            {task.dueDate
-                              ? new Date(task.dueDate).toLocaleDateString()
-                              : "No due date"}
+                            High: {item.high} • Urgent: {item.urgent}
                           </p>
                         </div>
                       </div>
                       <Badge
                         variant="outline"
                         className={
-                          isOverdue
+                          hasUrgent
                             ? "bg-red-50 text-red-700 border-red-200 font-medium"
                             : "bg-orange-50 text-orange-700 border-orange-200 font-medium"
                         }
                       >
-                        {isOverdue ? "OVERDUE" : "HIGH PRIORITY"}
+                        {hasUrgent ? "NEEDS ACTION" : "HIGH PRIORITY"}
                       </Badge>
                     </div>
                   );
@@ -703,8 +734,33 @@ function BarRow({
   label: string;
   value: number;
   total: number;
-  barClass: string;
+  barClass:
+    | "bg-emerald-500"
+    | "bg-blue-500"
+    | "bg-amber-500"
+    | "bg-red-500"
+    | "bg-indigo-500"; // NEW
 }) {
+  // Tailwind JIT-safe inner color class
+  let innerColorClass = "";
+  switch (barClass) {
+    case "bg-emerald-500":
+      innerColorClass = "[&>div]:bg-emerald-500";
+      break;
+    case "bg-blue-500":
+      innerColorClass = "[&>div]:bg-blue-500";
+      break;
+    case "bg-amber-500":
+      innerColorClass = "[&>div]:bg-amber-500";
+      break;
+    case "bg-red-500":
+      innerColorClass = "[&>div]:bg-red-500";
+      break;
+    case "bg-indigo-500":
+      innerColorClass = "[&>div]:bg-indigo-500";
+      break;
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
@@ -718,7 +774,7 @@ function BarRow({
       </div>
       <Progress
         value={total ? (value / total) * 100 : 0}
-        className={`h-2.5 bg-slate-200 [&>div]:${barClass} [&>div]:rounded-full`}
+        className={`h-2.5 bg-slate-200 ${innerColorClass} [&>div]:rounded-full`}
       />
     </div>
   );

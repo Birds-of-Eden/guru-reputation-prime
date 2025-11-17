@@ -357,7 +357,7 @@ export function PackageCards() {
           const healthScore = getPackageHealthScore(pkg);
 
           return (
-            <Card
+           <Card
               key={pkg.id}
               className="group overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 border-0 ring-1 ring-gray-200 hover:ring-blue-300 hover:scale-101"
             >
@@ -370,6 +370,11 @@ export function PackageCards() {
                         <PackageIcon className="w-6 h-6 text-white" />
                       </div>
                       <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors leading-tight">
+                            {pkg.name || `Package ${pkg.id.slice(0, 8)}`}
+                          </h3>
+                        </div>
                         <p className="text-xs text-gray-500 mt-1">
                           ID: {pkg.id.slice(0, 8)}...
                         </p>
