@@ -159,16 +159,19 @@ export default function TaskList({
       t.templateSiteAsset?.url ?? (t as any).assetUrl ?? (t as any).url ?? null
     );
   };
+
   const hideAssetSection = useMemo(
     () =>
       filteredTasks.length > 0 &&
       filteredTasks.every((t) => isAssetlessCategory(t)),
     [filteredTasks]
   );
+
   const [copied, setCopied] = useState<{
     id: string;
     type: "url" | "password" | "email" | "username";
   } | null>(null);
+
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(
     new Set()
   );
@@ -194,6 +197,7 @@ export default function TaskList({
       s.has(id) ? s.delete(id) : s.add(id);
       return s;
     });
+
   const [lastKnownUrl, setLastKnownUrl] = useState<Map<string, string>>(
     new Map()
   );
@@ -212,20 +216,22 @@ export default function TaskList({
 
   const getDisplayUrl = (t: Task) =>
     computeUrl(t) ?? lastKnownUrl.get(t.id) ?? null;
+
   const canReveal = (t: Task, timer: TimerState | null) => {
     const isActive = timer?.taskId === t.id && timer?.isRunning;
     return t.status !== "pending" || isActive;
   };
+
   const mask = (s?: string | null) => (s ? "*********" : "N/A");
 
   // তারিখ ভিত্তিক টাস্ক গ্রুপিং
   const groupTasksByDate = (tasks: Task[]) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     const dayAfterTomorrow = new Date(today);
     dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
 
@@ -233,12 +239,19 @@ export default function TaskList({
       today: [] as Task[],
       tomorrow: [] as Task[],
       upcoming: [] as Task[],
+      reassigned: [] as Task[], // ⬅️ NEW GROUP
       completed: [] as Task[],
     };
 
-    tasks.forEach(task => {
+    tasks.forEach((task) => {
       if (task.status === "completed" || task.status === "qc_approved") {
         groups.completed.push(task);
+        return;
+      }
+
+      // ⬅️ NEW: reassigned task gula alada group-e
+      if (task.status === "reassigned") {
+        groups.reassigned.push(task);
         return;
       }
 
@@ -298,11 +311,11 @@ export default function TaskList({
 
   // তারিখ ফরম্যাট ফাংশন
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
@@ -314,6 +327,8 @@ export default function TaskList({
         return taskGroups.tomorrow;
       case "upcoming":
         return taskGroups.upcoming;
+      case "reassigned":
+        return taskGroups.reassigned;
       case "completed":
         return taskGroups.completed;
       default:
@@ -706,7 +721,12 @@ export default function TaskList({
                                     : "opacity-50 cursor-not-allowed"
                                 }`}
                                 onClick={() =>
-                                  handleCopy(displayUrl, task.id, "url", reveal)
+                                  handleCopy(
+                                    displayUrl,
+                                    task.id,
+                                    "url",
+                                    reveal
+                                  )
                                 }
                                 disabled={!reveal}
                                 aria-label="Copy URL"
@@ -1186,95 +1206,129 @@ export default function TaskList({
             </div>
           </CardHeader>
         </div>
-          {/* সার্চ এবং ফিল্টার */}
-          <div className="flex flex-col xl:flex-row mt-5 gap-6 mb-8 items-start">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-400 h-5 w-5" />
-              <Input
-                placeholder="Search tasks by name, category, asset, or completion link..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-12 h-14 border-2 border-violet-200 dark:border-violet-700 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 text-gray-900 dark:text-gray-50 rounded-2xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 text-base shadow-lg transition-all duration-300 placeholder:text-violet-400"
-              />
-            </div>
-            <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-auto">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full lg:w-[200px] h-14 border-2 border-blue-200 dark:border-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl text-base shadow-lg font-medium">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-2 border-blue-200 dark:border-blue-700 shadow-2xl">
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="in_progress">In Progress</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                  <SelectItem value="reassigned">Reassigned</SelectItem>
-                  <SelectItem value="qc_approved">QC Approved</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                <SelectTrigger className="w-full lg:w-[200px] h-14 border-2 border-emerald-200 dark:border-emerald-700 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl text-base shadow-lg font-medium">
-                  <SelectValue placeholder="All Priorities" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl border-2 border-emerald-200 dark:border-emerald-700 shadow-2xl">
-                  <SelectItem value="all">All Priorities</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        {/* সার্চ এবং ফিল্টার */}
+        <div className="flex flex-col xl:flex-row mt-5 gap-6 mb-8 items-start px-8">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-400 h-5 w-5" />
+            <Input
+              placeholder="Search tasks by name, category, asset, or completion link..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 h-14 border-2 border-violet-200 dark:border-violet-700 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 text-gray-900 dark:text-gray-50 rounded-2xl focus:ring-4 focus:ring-violet-500/20 focus:border-violet-500 text-base shadow-lg transition-all duration-300 placeholder:text-violet-400"
+            />
           </div>
+          <div className="flex flex-col lg:flex-row gap-4 w-full xl:w-auto">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full lg:w-[200px] h-14 border-2 border-blue-200 dark:border-blue-700 bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 rounded-2xl text-base shadow-lg font-medium">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-2 border-blue-200 dark:border-blue-700 shadow-2xl">
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="reassigned">Reassigned</SelectItem>
+                <SelectItem value="qc_approved">QC Approved</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+              <SelectTrigger className="w-full lg:w-[200px] h-14 border-2 border-emerald-200 dark:border-emerald-700 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 rounded-2xl text-base shadow-lg font-medium">
+                <SelectValue placeholder="All Priorities" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl border-2 border-emerald-200 dark:border-emerald-700 shadow-2xl">
+                <SelectItem value="all">All Priorities</SelectItem>
+                <SelectItem value="urgent">Urgent</SelectItem>
+                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="medium">Medium</SelectItem>
+                <SelectItem value="low">Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <CardContent className="p-8 max-w-full overflow-x-hidden">
           {/* তারিখ ভিত্তিক ট্যাব */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mb-8">
-            <TabsList className="grid w-full grid-cols-4 h-14 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 border-2 border-violet-200 dark:border-violet-700 rounded-2xl p-1">
-              <TabsTrigger 
-                value="today" 
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full mb-8"
+          >
+            <TabsList className="grid w-full grid-cols-5 h-14 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 border-2 border-violet-200 dark:border-violet-700 rounded-2xl p-1">
+              <TabsTrigger
+                value="today"
                 className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
               >
                 <Clock className="h-4 w-4" />
                 Today
                 {taskGroups.today.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 bg-white text-violet-600">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 bg-white text-violet-600"
+                  >
                     {taskGroups.today.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger 
-                value="tomorrow" 
+              <TabsTrigger
+                value="tomorrow"
                 className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
               >
                 <Calendar className="h-4 w-4" />
                 Tomorrow
                 {taskGroups.tomorrow.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 bg-white text-violet-600">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 bg-white text-violet-600"
+                  >
                     {taskGroups.tomorrow.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger 
-                value="upcoming" 
+              <TabsTrigger
+                value="upcoming"
                 className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
               >
                 <Calendar className="h-4 w-4" />
                 Upcoming
                 {taskGroups.upcoming.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 bg-white text-violet-600">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 bg-white text-violet-600"
+                  >
                     {taskGroups.upcoming.length}
                   </Badge>
                 )}
               </TabsTrigger>
-              <TabsTrigger 
-                value="completed" 
+
+              {/* Reassigned tab - Completed er ager position e */}
+              <TabsTrigger
+                value="reassigned"
+                className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Reassigned
+                {taskGroups.reassigned.length > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 bg-white text-violet-600"
+                  >
+                    {taskGroups.reassigned.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+
+              <TabsTrigger
+                value="completed"
                 className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
               >
                 <CheckCircle className="h-4 w-4" />
                 Completed
                 {taskGroups.completed.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 bg-white text-violet-600">
+                  <Badge
+                    variant="secondary"
+                    className="ml-1 bg-white text-violet-600"
+                  >
                     {taskGroups.completed.length}
                   </Badge>
                 )}
@@ -1315,7 +1369,12 @@ export default function TaskList({
             <TabsContent value="tomorrow" className="mt-6">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                  Tomorrow's Tasks - {formatDate(new Date(new Date().setDate(new Date().getDate() + 1)))}
+                  Tomorrow's Tasks -{" "}
+                  {formatDate(
+                    new Date(
+                      new Date().setDate(new Date().getDate() + 1)
+                    )
+                  )}
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400">
                   Tasks scheduled for tomorrow
@@ -1372,6 +1431,37 @@ export default function TaskList({
               )}
             </TabsContent>
 
+            {/* Reassigned tab content */}
+            <TabsContent value="reassigned" className="mt-6">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                  Reassigned Tasks
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Tasks that have been reassigned and need your attention
+                </p>
+              </div>
+              {currentTasks.length > 0 ? (
+                viewMode === "list" ? (
+                  renderListView(currentTasks)
+                ) : (
+                  renderGridView(currentTasks)
+                )
+              ) : (
+                <div className="py-16 text-center">
+                  <div className="mx-auto w-32 h-32 bg-gradient-to-br from-yellow-100 to-amber-100 dark:from-yellow-800/30 dark:to-amber-800/30 rounded-3xl flex items-center justify-center mb-6 shadow-2xl border-2 border-yellow-200 dark:border-yellow-700">
+                    <Calendar className="h-12 w-12 text-yellow-500" />
+                  </div>
+                  <p className="text-gray-600 dark:text-gray-300 text-xl font-bold mb-2">
+                    No reassigned tasks!
+                  </p>
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Currently you have no tasks marked as reassigned.
+                  </p>
+                </div>
+              )}
+            </TabsContent>
+
             <TabsContent value="completed" className="mt-6">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -1402,8 +1492,6 @@ export default function TaskList({
               )}
             </TabsContent>
           </Tabs>
-
-          
 
           {/* টাস্ক কাউন্টার */}
           {currentTasks.length > 0 && (
