@@ -21,13 +21,14 @@ interface CreateTasksButtonProps {
   onTaskCreationComplete?: () => void;
 }
 
-export default function CreateTasksButton({
+export default function CreateTasksManualButton({
   clientId,
   disabled = false,
   onTaskCreationComplete,
 }: CreateTasksButtonProps) {
   const [open, setOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [dueDate, setDueDate] = useState<string>("");
   const SITE_ASSET_TYPES = [
     "social_site",
     "web2_site",
@@ -119,14 +120,16 @@ export default function CreateTasksButton({
             taskId: t.id,
             agentId: userId,
             note: "Auto-assigned to current user after manual generation",
-            dueDate:
-              t?.dueDate && typeof t.dueDate === "string"
-                ? t.dueDate
-                : (() => {
-                    const d = new Date();
-                    d.setDate(d.getDate() + 7);
-                    return d.toISOString();
-                  })(),
+            dueDate: (() => {
+              if (dueDate && typeof dueDate === "string") {
+                const d = new Date(dueDate + "T12:00:00");
+                if (!Number.isNaN(d.getTime())) return d.toISOString();
+              }
+              if (t?.dueDate && typeof t.dueDate === "string") return t.dueDate;
+              const d = new Date();
+              d.setDate(d.getDate() + 7);
+              return d.toISOString();
+            })(),
           }));
 
           const distRes = await fetch(`/api/tasks/dataentry-distribute`, {
@@ -226,9 +229,9 @@ export default function CreateTasksButton({
               Task Generator Estiak
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-              Select asset types and specify how many cycles to create. Each cycle
-              creates tasks for all assets of that type (e.g., 5 cycles × 10 assets
-              = 50 tasks).
+              Select asset types and specify how many cycles to create. Each
+              cycle creates tasks for all assets of that type (e.g., 5 cycles ×
+              10 assets = 50 tasks).
             </DialogDescription>
           </DialogHeader>
 
@@ -258,13 +261,25 @@ export default function CreateTasksButton({
                 </div>
                 <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
                   {Object.entries(countsByType).reduce(
-                    (sum, [type, cycles]) => {
-                      const assets = assetCountsByType[type as SiteAssetTypeLocal] || 0;
-                      return sum + (cycles || 0) * assets;
-                    },
+                    (acc, [, v]) => acc + Number(v || 0),
                     0
                   )}
                 </span>
+              </div>
+              <div className="mt-4 flex items-center gap-3">
+                <Label
+                  htmlFor="manual-due-date"
+                  className="text-xs font-medium text-gray-700 dark:text-gray-300"
+                >
+                  Due date for new tasks
+                </Label>
+                <Input
+                  id="manual-due-date"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="h-8 w-40 text-xs"
+                />
               </div>
             </div>
           </div>
@@ -283,10 +298,14 @@ export default function CreateTasksButton({
                     </Label>
                     {assetCountsByType[type] ? (
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {assetCountsByType[type]} asset{assetCountsByType[type] !== 1 ? 's' : ''}
+                        {assetCountsByType[type]} asset
+                        {assetCountsByType[type] !== 1 ? "s" : ""}
                         {countsByType[type] ? (
                           <span className="font-semibold text-blue-600 dark:text-blue-400 ml-1">
-                            → {(countsByType[type] || 0) * (assetCountsByType[type] || 0)} tasks
+                            →{" "}
+                            {(countsByType[type] || 0) *
+                              (assetCountsByType[type] || 0)}{" "}
+                            tasks
                           </span>
                         ) : null}
                       </p>

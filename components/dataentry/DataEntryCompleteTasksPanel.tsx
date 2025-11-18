@@ -43,6 +43,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import CreateTasksButton from "./CreateTasksAuto";
+import CreateTasksManualButton from "./CreateTasksButtonManual";
 
 // Lazy load modal components
 const LazyContentWritingModal = lazy(
@@ -1215,7 +1217,7 @@ export default function DataEntryCompleteTasksPanel({
               </div>
             </div>
             <>
-              <div className="flex items-center gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {showCreateTasksButton && (
                   <Button
                     onClick={handleCreateTasksChoiceOpen}
@@ -1225,7 +1227,7 @@ export default function DataEntryCompleteTasksPanel({
                   </Button>
                 )}
 
-                {isDueOver && showRenewButton && (
+                {isDueOver && (
                   <RenewPostingTasksButton
                     clientId={clientId}
                     templateId={undefined}
@@ -1234,13 +1236,11 @@ export default function DataEntryCompleteTasksPanel({
                   />
                 )}
 
-                {showCreateNextButton && (
-                  <CreateNextTasksAuto
-                    clientId={clientId}
-                    assigneeId={lastUsedAgent || undefined}
-                    onComplete={handleCreateNextComplete}
-                  />
-                )}
+                <CreateNextTasksAuto
+                  clientId={clientId}
+                  assigneeId={lastUsedAgent || undefined}
+                  onComplete={handleCreateNextComplete}
+                />
               </div>
               <Dialog
                 open={createTasksChoiceOpen}
@@ -1262,18 +1262,21 @@ export default function DataEntryCompleteTasksPanel({
                         onTaskCreationComplete={handleTaskCreationComplete}
                       />
                     </div>
-                    {/* <div className="rounded-lg border p-4">
+                    <div className="rounded-lg border p-4">
                       <div className="font-semibold mb-2">Manual</div>
-                      <p className="text-sm text-muted-foreground mb-3">Pick counts per asset type and generate. Tasks will auto-assign to you.</p>
-                      <CreateTasksButton
+                      <p className="text-sm text-muted-foreground mb-3">
+                        Pick counts per asset type and generate. Tasks will
+                        auto-assign to you.
+                      </p>
+                      <CreateTasksManualButton
                         clientId={clientId}
                         onTaskCreationComplete={() => {
                           setHasCreatedTasks(true);
                           setCreateTasksChoiceOpen(false);
-                          load();
+                          refetchTasks();
                         }}
                       />
-                    </div> */}
+                    </div>
                   </div>
                   <DialogFooter>
                     <Button
