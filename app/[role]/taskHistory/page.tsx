@@ -1,26 +1,39 @@
+// app/[role]/taskHistory/page.tsx
+
 "use client";
 
 import * as React from "react";
 import useSWR from "swr";
 import { Loader2 } from "lucide-react";
-import TaskHistory, { type TaskHistoryRow } from "@/components/client-tasks-view/TaskHistory";
+import TaskHistory, {
+  type TaskHistoryRow,
+} from "@/components/client-tasks-view/TaskHistory";
 
 type MeResponse = {
   user?: { id?: string } | null;
 };
 
 const fetcher = (u: string) =>
-  fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : Promise.reject(r.status)));
+  fetch(u, { cache: "no-store" }).then((r) =>
+    r.ok ? r.json() : Promise.reject(r.status)
+  );
 
 export default function Page() {
-  
-  const { data: me, isLoading: meLoading, error: meError } = useSWR<MeResponse>("/api/auth/me", fetcher, {
+  const {
+    data: me,
+    isLoading: meLoading,
+    error: meError,
+  } = useSWR<MeResponse>("/api/auth/me", fetcher, {
     revalidateOnFocus: true,
   });
   const agentId = me?.user?.id;
 
   // Fetch Task History BY AgentID
-  const { data: rows, isLoading: rowsLoading, error: rowsError } = useSWR<TaskHistoryRow[]>(
+  const {
+    data: rows,
+    isLoading: rowsLoading,
+    error: rowsError,
+  } = useSWR<TaskHistoryRow[]>(
     agentId ? `/api/tasks/history/${agentId}` : null,
     fetcher,
     { revalidateOnFocus: true }
@@ -30,7 +43,9 @@ export default function Page() {
     return (
       <div className="min-h-[40vh] flex flex-col items-center justify-center gap-2">
         <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
-        <p className="text-sm text-muted-foreground">Loading your Task History…</p>
+        <p className="text-sm text-muted-foreground">
+          Loading your Task History…
+        </p>
       </div>
     );
   }
@@ -39,8 +54,12 @@ export default function Page() {
     return (
       <div className="min-h-[40vh] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-sm text-red-600">Could not resolve your agent session.</p>
-          <p className="text-xs text-muted-foreground mt-1">Please sign in again.</p>
+          <p className="text-sm text-red-600">
+            Could not resolve your agent session.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Please sign in again.
+          </p>
         </div>
       </div>
     );
@@ -49,7 +68,6 @@ export default function Page() {
   if (rowsError) {
     return <TaskHistory rows={[]} />;
   }
-
 
   return <TaskHistory rows={rows ?? []} />;
 }
