@@ -8,6 +8,7 @@ import React, {
   useCallback,
   lazy,
   Suspense,
+  useDeferredValue,
 } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import CreateTasksButton from "./CreateTasksAuto";
 import CreateTasksManualButton from "./CreateTasksButtonManual";
 
 // Lazy load modal components
@@ -60,159 +60,9 @@ const LazySummaryReportModal = lazy(
 const LazyCompletionDialog = lazy(() => import("./DataEntryCompletionDialog"));
 const LazyMonitoringDialog = lazy(() => import("./DataEntryMonitoringTask"));
 
-// Custom hooks for data fetching with SWR
-const useTasksData = (clientId: string, userId?: string) => {
-  const {
-    data: tasksData,
-    error,
-    isLoading,
-    mutate,
-  } = useSWR(
-    clientId ? `/api/tasks/client/${clientId}` : null,
-    async (url: string) => {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) throw new Error("Failed to fetch tasks");
-      const data = await response.json();
-      return (data as any[]).filter(
-        (t) => t?.assignedTo?.id && userId && t.assignedTo.id === userId
-      );
-    },
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 10000,
-      refreshInterval: 30000,
-      errorRetryCount: 3,
-      errorRetryInterval: 5000,
-    }
-  );
-
-  return { tasks: tasksData || [], loading: isLoading, error, refetch: mutate };
-};
-
-const useAgentsData = () => {
-  const {
-    data: agentsData,
-    error,
-    isLoading,
-  } = useSWR(
-    "/api/users?role=agent&limit=200",
-    async (url: string) => {
-      const response = await fetch(url, { cache: "no-store" });
-      if (!response.ok) throw new Error("Failed to fetch agents");
-      const data = await response.json();
-      return (data?.users ?? data?.data ?? [])
-        .filter((u: any) => u?.role?.name?.toLowerCase() === "agent")
-        .map((u: any) => ({
-          id: u.id,
-          name: u.name ?? null,
-          email: u.email ?? null,
-        }));
-    },
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 30000,
-      refreshInterval: 300000, // 5 minutes for agents
-      errorRetryCount: 3,
-      errorRetryInterval: 5000,
-    }
-  );
-
-  return { agents: agentsData || [], loading: isLoading, error };
-};
-
-const useClientData = (clientId: string) => {
-  const {
-    data: clientData,
-    error,
-    isLoading,
-  } = useSWR(
-    clientId ? `/api/clients/${clientId}` : null,
-    async (url: string) => {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch client");
-      return response.json();
-    },
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 30000,
-      refreshInterval: 60000, // 1 minute
-      errorRetryCount: 2,
-      errorRetryInterval: 3000,
-    }
-  );
-
-  return {
-    client: clientData,
-    loading: isLoading,
-    error,
-    clientName: clientData?.name || `Client ${clientId}`,
-    clientEmail: clientData?.email || "",
-    packageMonths: Number(clientData?.package?.totalMonths) || 1,
-    isDueOver: clientData?.dueDate
-      ? new Date(clientData.dueDate) < new Date()
-      : false,
-  };
-};
-
-const useStatsData = (clientId: string, userId?: string) => {
-  const {
-    data: statsData,
-    error,
-    isLoading,
-  } = useSWR(
-    clientId && userId
-      ? `/api/tasks/data-entry-reports?clientId=${clientId}&pageSize=1000`
-      : null,
-    async (url: string) => {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error("Failed to fetch stats");
-      const data = await response.json();
-      const reports = Array.isArray(data?.data) ? data.data : [];
-
-      const today = new Date();
-      const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-      const thirtyDaysAgo = new Date(
-        today.getTime() - 30 * 24 * 60 * 60 * 1000
-      );
-
-      const completedByMe = reports.reduce((acc: number, t: any) => {
-        const rid = t?.dataEntryReport?.completedByUserId;
-        return acc + (userId && rid === userId ? 1 : 0);
-      }, 0);
-
-      const last7Days = reports.filter(
-        (t: any) =>
-          t.dataEntryCompletedAt &&
-          new Date(t.dataEntryCompletedAt) >= sevenDaysAgo
-      ).length;
-
-      const last30Days = reports.filter(
-        (t: any) =>
-          t.dataEntryCompletedAt &&
-          new Date(t.dataEntryCompletedAt) >= thirtyDaysAgo
-      ).length;
-
-      return {
-        dataEntryCompleted: completedByMe,
-        last7Days,
-        last30Days,
-      };
-    },
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      dedupingInterval: 15000,
-      refreshInterval: 60000, // 1 minute
-      errorRetryCount: 2,
-      errorRetryInterval: 3000,
-    }
-  );
-
-  return { stats: statsData, loading: isLoading, error };
-};
+// ----------------------
+// Types & Constants
+// ----------------------
 
 export type DETask = {
   id: string;
@@ -257,6 +107,291 @@ const priorityColor: Record<string, string> = {
   low: "text-green-600",
 };
 
+// Helper category checks (pure functions, stable references)
+const SIMPLE_CATEGORIES = [
+  "Social Activity",
+  "Blog Posting",
+  "Image Optimization",
+  "Content Studio",
+];
+
+const CONTENT_WRITING_CATEGORIES = ["Content Writing", "Guest Posting"];
+
+export function isSimpleTask(task: DETask | null): boolean {
+  if (!task?.category?.name) return false;
+  return SIMPLE_CATEGORIES.includes(task.category.name);
+}
+
+export function isContentWritingTask(task: DETask | null): boolean {
+  if (!task?.category?.name) return false;
+  return CONTENT_WRITING_CATEGORIES.some((cat) =>
+    task.category?.name?.toLowerCase().includes(cat.toLowerCase())
+  );
+}
+
+export function isReviewRemovalTask(task: DETask | null): boolean {
+  if (!task?.category) return false;
+  const nameLc = (task.category.name || "").toLowerCase();
+  const idLc = (task.category.id || "").toLowerCase();
+  return (
+    nameLc.includes("review removal") ||
+    nameLc === "review_removal" ||
+    idLc.includes("review_removal")
+  );
+}
+
+export function isBacklinkingTask(task: DETask | null): boolean {
+  if (!task?.category) return false;
+  const nameLc = (task.category.name || "").toLowerCase();
+  const idLc = (task.category.id || "").toLowerCase();
+  return nameLc.includes("backlinks") || idLc.includes("backlinks");
+}
+
+export function isSummaryReportTask(task: DETask | null): boolean {
+  if (!task?.category) return false;
+  const nameLc = (task.category.name || "").toLowerCase();
+  const idLc = (task.category.id || "").toLowerCase();
+  return (
+    nameLc.includes("summary report") ||
+    nameLc === "summary_report" ||
+    idLc.includes("summary_report")
+  );
+}
+
+export function isMonitoringTask(task: DETask | null): boolean {
+  if (!task?.category) return false;
+  const nameLc = (task.category.name || "").toLowerCase();
+  const idLc = (task.category.id || "").toLowerCase();
+  return nameLc.includes("monitoring") || idLc.includes("monitoring");
+}
+
+// Function to extract username from URL
+export function extractUsernameFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    const pathSegments = urlObj.pathname
+      .split("/")
+      .filter((segment) => segment.length > 0);
+
+    for (let i = 0; i < pathSegments.length; i++) {
+      const segment = pathSegments[i];
+      if (
+        [
+          "user",
+          "profile",
+          "account",
+          "users",
+          "profiles",
+          "accounts",
+          "dashboard",
+          "settings",
+          "admin",
+          "api",
+          "auth",
+          "login",
+          "signup",
+          "register",
+        ].includes(segment.toLowerCase())
+      ) {
+        if (i + 1 < pathSegments.length) {
+          const nextSegment = pathSegments[i + 1];
+          if (/^[a-zA-Z0-9._-]{3,30}$/.test(nextSegment)) {
+            return nextSegment;
+          }
+        }
+      }
+      if (/^[a-zA-Z0-9._-]{3,30}$/.test(segment)) {
+        return segment;
+      }
+    }
+
+    const searchParams = urlObj.searchParams;
+    if (
+      searchParams.has("user") ||
+      searchParams.has("username") ||
+      searchParams.has("profile") ||
+      searchParams.has("u")
+    ) {
+      return (
+        searchParams.get("user") ||
+        searchParams.get("username") ||
+        searchParams.get("profile") ||
+        searchParams.get("u") ||
+        ""
+      );
+    }
+
+    const fragment = urlObj.hash.substring(1);
+    if (fragment && /^[a-zA-Z0-9._-]{3,30}$/.test(fragment)) {
+      return fragment;
+    }
+
+    return "";
+  } catch {
+    return "";
+  }
+}
+
+// ----------------------
+// SWR Hooks
+// ----------------------
+
+const useTasksData = (clientId: string, userId?: string) => {
+  const shouldFetch = Boolean(clientId && userId);
+
+  const {
+    data: tasksData,
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(
+    shouldFetch ? `/api/tasks/client/${clientId}` : null,
+    async (url: string) => {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error("Failed to fetch tasks");
+      const data = await response.json();
+      // Keep logic identical: filter by assignedTo === userId
+      return (data as any[]).filter(
+        (t) => t?.assignedTo?.id && userId && t.assignedTo.id === userId
+      );
+    },
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 3000,
+    }
+  );
+
+  return {
+    tasks: tasksData || [],
+    loading: isLoading || !shouldFetch,
+    error,
+    refetch: mutate,
+  };
+};
+
+const useAgentsData = () => {
+  const {
+    data: agentsData,
+    error,
+    isLoading,
+  } = useSWR(
+    "/api/users?role=agent&limit=200",
+    async (url: string) => {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error("Failed to fetch agents");
+      const data = await response.json();
+      return (data?.users ?? data?.data ?? [])
+        .filter((u: any) => u?.role?.name?.toLowerCase() === "agent")
+        .map((u: any) => ({
+          id: u.id,
+          name: u.name ?? null,
+          email: u.email ?? null,
+        }));
+    },
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 5000,
+    }
+  );
+
+  return { agents: agentsData || [], loading: isLoading, error };
+};
+
+const useClientData = (clientId: string) => {
+  const {
+    data: clientData,
+    error,
+    isLoading,
+  } = useSWR(
+    clientId ? `/api/clients/${clientId}` : null,
+    async (url: string) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch client");
+      return response.json();
+    },
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 10000,
+    }
+  );
+
+  const clientName = clientData?.name || `Client ${clientId}`;
+  const clientEmail = clientData?.email || "";
+  const packageMonths = Number(clientData?.package?.totalMonths) || 1;
+  const isDueOver = clientData?.dueDate
+    ? new Date(clientData.dueDate) < new Date()
+    : false;
+
+  return {
+    client: clientData,
+    loading: isLoading,
+    error,
+    clientName,
+    clientEmail,
+    packageMonths,
+    isDueOver,
+  };
+};
+
+const useStatsData = (clientId: string, userId?: string) => {
+  const shouldFetch = Boolean(clientId && userId);
+
+  const {
+    data: statsData,
+    error,
+    isLoading,
+  } = useSWR(
+    shouldFetch
+      ? `/api/tasks/data-entry-reports?clientId=${clientId}&pageSize=1000`
+      : null,
+    async (url: string) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch stats");
+      const data = await response.json();
+      const reports = Array.isArray(data?.data) ? data.data : [];
+
+      const today = new Date();
+      const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const thirtyDaysAgo = new Date(
+        today.getTime() - 30 * 24 * 60 * 60 * 1000
+      );
+
+      const completedByMe = reports.reduce((acc: number, t: any) => {
+        const rid = t?.dataEntryReport?.completedByUserId;
+        return acc + (userId && rid === userId ? 1 : 0);
+      }, 0);
+
+      const last7Days = reports.filter(
+        (t: any) =>
+          t.dataEntryCompletedAt &&
+          new Date(t.dataEntryCompletedAt) >= sevenDaysAgo
+      ).length;
+
+      const last30Days = reports.filter(
+        (t: any) =>
+          t.dataEntryCompletedAt &&
+          new Date(t.dataEntryCompletedAt) >= thirtyDaysAgo
+      ).length;
+
+      return {
+        dataEntryCompleted: completedByMe,
+        last7Days,
+        last30Days,
+      };
+    },
+    {
+      keepPreviousData: true,
+      revalidateOnFocus: false,
+      dedupingInterval: 5000,
+    }
+  );
+
+  return { stats: statsData, loading: isLoading || !shouldFetch, error };
+};
+
 interface TaskStats {
   total: number;
   completed: number;
@@ -270,195 +405,26 @@ interface TaskStats {
   byPriority: Record<string, number>;
 }
 
-export default function DataEntryCompleteTasksPanel({
-  clientId,
-}: {
-  clientId: string;
-}) {
-  const router = useRouter();
-  const roleSegment = useRoleSegment();
-  const distributionBasePath = `/${roleSegment}/distribution/client-agent`;
-  const { user } = useUserSession();
+// ----------------------
+// Memoized Task Row
+// ----------------------
 
-  // Use SWR hooks for data fetching
-  const {
-    tasks,
-    loading: tasksLoading,
-    refetch: refetchTasks,
-  } = useTasksData(clientId, user?.id);
-  const { agents, loading: agentsLoading } = useAgentsData();
-  const {
-    clientName,
-    clientEmail,
-    packageMonths,
-    isDueOver,
-    loading: clientLoading,
-  } = useClientData(clientId);
-  const { stats: statsData, loading: statsLoading } = useStatsData(
-    clientId,
-    user?.id
-  );
+interface TaskRowProps {
+  data: {
+    task: DETask;
+    dueDateFormatted: string | null;
+    isOverdue: boolean;
+  };
+  openContentWritingModal: (task: DETask) => void;
+  openReviewRemovalModal: (task: DETask) => void;
+  openBacklinkingModal: (task: DETask) => void;
+  openSummaryReportModal: (task: DETask) => void;
+  openMonitoringModal: (task: DETask) => void;
+  openComplete: (task: DETask) => void;
+}
 
-  // Combined loading state
-  const loading =
-    tasksLoading || agentsLoading || clientLoading || statsLoading;
-
-  // Debounced search state
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-
-  // Filters
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [priorityFilter, setPriorityFilter] = useState("all");
-
-  // Modal states
-  const [selected, setSelected] = useState<DETask | null>(null);
-  const [link, setLink] = useState("");
-  const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [lastUsedPassword, setLastUsedPassword] = useState<string | null>(null);
-  const [doneBy, setDoneBy] = useState<string>("");
-  const [completedAt, setCompletedAt] = useState<Date | undefined>(undefined);
-  const [lastUsedDate, setLastUsedDate] = useState<Date | null>(null);
-  const [lastUsedAgent, setLastUsedAgent] = useState<string | null>(null);
-  const [agentSearchTerm, setAgentSearchTerm] = useState("");
-  const [createTasksChoiceOpen, setCreateTasksChoiceOpen] = useState(false);
-  const [createNextChoiceOpen, setCreateNextChoiceOpen] = useState(false);
-
-  // Content Writing Modal state
-  const [contentWritingModalOpen, setContentWritingModalOpen] = useState(false);
-  const [selectedContentTask, setSelectedContentTask] = useState<DETask | null>(
-    null
-  );
-
-  // Review Removal Modal state
-  const [reviewRemovalModalOpen, setReviewRemovalModalOpen] = useState(false);
-  const [selectedReviewRemovalTask, setSelectedReviewRemovalTask] =
-    useState<DETask | null>(null);
-
-  // Backlinking Modal state
-  const [backlinkingModalOpen, setBacklinkingModalOpen] = useState(false);
-  const [selectedBacklinkingTask, setSelectedBacklinkingTask] =
-    useState<DETask | null>(null);
-
-  // Summary Report Modal state
-  const [summaryReportModalOpen, setSummaryReportModalOpen] = useState(false);
-  const [selectedSummaryReportTask, setSelectedSummaryReportTask] =
-    useState<DETask | null>(null);
-
-  // Monitoring modal state
-  const [monitoringModalOpen, setMonitoringModalOpen] = useState(false);
-  const [selectedMonitoringTask, setSelectedMonitoringTask] =
-    useState<DETask | null>(null);
-
-  // Button states from localStorage
-  const [showCreateTasksButton, setShowCreateTasksButton] = useState(true);
-  const [showRenewButton, setShowRenewButton] = useState(false);
-  const [showCreateNextButton, setShowCreateNextButton] = useState(false);
-  const [hasCreatedTasks, setHasCreatedTasks] = useState(false);
-
-  const [creatingPosting, setCreatingPosting] = useState(false);
-
-  // Task stats calculation
-  const taskStats = useMemo(() => {
-    const total = tasks.length;
-    const completed = tasks.filter(
-      (t) => t.status === "completed" || t.status === "qc_approved"
-    ).length;
-    const pending = tasks.filter((t) => t.status === "pending").length;
-    const inProgress = tasks.filter((t) => t.status === "in_progress").length;
-    const overdue = tasks.filter((t) => {
-      if (!t.dueDate) return false;
-      return (
-        new Date(t.dueDate) < new Date() &&
-        (t.status === "pending" || t.status === "in_progress")
-      );
-    }).length;
-
-    return {
-      total,
-      completed,
-      pending,
-      inProgress,
-      overdue,
-      dataEntryCompleted: statsData?.dataEntryCompleted || 0,
-      last7Days: statsData?.last7Days || 0,
-      last30Days: statsData?.last30Days || 0,
-    };
-  }, [tasks, statsData]);
-
-  // Debounce search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(searchQuery);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
-
-  // Pre-indexed filtering for O(1) lookups
-  const filteredTasks = useMemo(() => {
-    let result = tasks;
-
-    // Apply search filter
-    if (debouncedSearch.trim()) {
-      const query = debouncedSearch.toLowerCase().trim();
-      result = result.filter((t) =>
-        [t.name, t.category?.name || "", t.priority || "", t.status || ""].some(
-          (s) => String(s).toLowerCase().includes(query)
-        )
-      );
-    }
-
-    // Apply status filter
-    if (statusFilter !== "all") {
-      result = result.filter((t) => t.status === statusFilter);
-    }
-
-    // Apply priority filter
-    if (priorityFilter !== "all") {
-      result = result.filter((t) => t.priority === priorityFilter);
-    }
-
-    return result;
-  }, [tasks, debouncedSearch, statusFilter, priorityFilter]);
-
-  // Simple client-side pagination to avoid rendering a huge table at once
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
-
-  const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(filteredTasks.length / pageSize));
-  }, [filteredTasks.length, pageSize]);
-
-  useEffect(() => {
-    // reset page if filteredTasks shrink
-    if (page > totalPages) setPage(1);
-  }, [page, totalPages]);
-
-  const paginatedTasks = useMemo(() => {
-    const start = (page - 1) * pageSize;
-    const slice = filteredTasks.slice(start, start + pageSize);
-
-    // Precompute some derived values (formatting, overdue) once per pagination change
-    const now = Date.now();
-    return slice.map((t) => {
-      const dueDateObj = t.dueDate ? new Date(t.dueDate) : null;
-      const dueDateFormatted =
-        dueDateObj && !isNaN(dueDateObj.getTime())
-          ? format(dueDateObj, "MMM dd, yyyy")
-          : null;
-      const isOverdue = !!(
-        dueDateObj &&
-        dueDateObj.getTime() < now &&
-        (t.status === "pending" || t.status === "in_progress")
-      );
-      return { task: t, dueDateFormatted, isOverdue };
-    });
-  }, [filteredTasks, page, pageSize]);
-
-  // Memoized row component to avoid re-rendering rows unnecessarily
-  const TaskRow = React.memo(function TaskRow({
+const TaskRow: React.FC<TaskRowProps> = React.memo(
+  ({
     data,
     openContentWritingModal,
     openReviewRemovalModal,
@@ -466,7 +432,7 @@ export default function DataEntryCompleteTasksPanel({
     openSummaryReportModal,
     openMonitoringModal,
     openComplete,
-  }: any) {
+  }) => {
     const { task: t, dueDateFormatted, isOverdue } = data;
 
     return (
@@ -609,7 +575,199 @@ export default function DataEntryCompleteTasksPanel({
         </td>
       </tr>
     );
-  });
+  }
+);
+
+TaskRow.displayName = "TaskRow";
+
+// ----------------------
+// Main Component
+// ----------------------
+
+export default function DataEntryCompleteTasksPanel({
+  clientId,
+}: {
+  clientId: string;
+}) {
+  const router = useRouter();
+  const roleSegment = useRoleSegment();
+  const distributionBasePath = `/${roleSegment}/distribution/client-agent`;
+  const { user } = useUserSession();
+
+  // Use SWR hooks for data fetching
+  const {
+    tasks,
+    loading: tasksLoading,
+    refetch: refetchTasks,
+  } = useTasksData(clientId, user?.id);
+  const { agents, loading: agentsLoading } = useAgentsData();
+  const {
+    clientName,
+    clientEmail,
+    packageMonths,
+    isDueOver,
+    loading: clientLoading,
+  } = useClientData(clientId);
+  const { stats: statsData, loading: statsLoading } = useStatsData(
+    clientId,
+    user?.id
+  );
+
+  // Combined loading state
+  const loading =
+    tasksLoading || agentsLoading || clientLoading || statsLoading;
+
+  // Debounced search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const deferredSearch = useDeferredValue(debouncedSearch);
+
+  // Filters
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+
+  // Modal states
+  const [selected, setSelected] = useState<DETask | null>(null);
+  const [link, setLink] = useState("");
+  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [lastUsedPassword, setLastUsedPassword] = useState<string | null>(null);
+  const [doneBy, setDoneBy] = useState<string>("");
+  const [completedAt, setCompletedAt] = useState<Date | undefined>(undefined);
+  const [lastUsedDate, setLastUsedDate] = useState<Date | null>(null);
+  const [lastUsedAgent, setLastUsedAgent] = useState<string | null>(null);
+  const [agentSearchTerm, setAgentSearchTerm] = useState("");
+  const [createTasksChoiceOpen, setCreateTasksChoiceOpen] = useState(false);
+  const [createNextChoiceOpen, setCreateNextChoiceOpen] = useState(false);
+
+  // Content Writing Modal state
+  const [contentWritingModalOpen, setContentWritingModalOpen] = useState(false);
+  const [selectedContentTask, setSelectedContentTask] = useState<DETask | null>(
+    null
+  );
+
+  // Review Removal Modal state
+  const [reviewRemovalModalOpen, setReviewRemovalModalOpen] = useState(false);
+  const [selectedReviewRemovalTask, setSelectedReviewRemovalTask] =
+    useState<DETask | null>(null);
+
+  // Backlinking Modal state
+  const [backlinkingModalOpen, setBacklinkingModalOpen] = useState(false);
+  const [selectedBacklinkingTask, setSelectedBacklinkingTask] =
+    useState<DETask | null>(null);
+
+  // Summary Report Modal state
+  const [summaryReportModalOpen, setSummaryReportModalOpen] = useState(false);
+  const [selectedSummaryReportTask, setSelectedSummaryReportTask] =
+    useState<DETask | null>(null);
+
+  // Monitoring modal state
+  const [monitoringModalOpen, setMonitoringModalOpen] = useState(false);
+  const [selectedMonitoringTask, setSelectedMonitoringTask] =
+    useState<DETask | null>(null);
+
+  // Button states from localStorage
+  const [showCreateTasksButton, setShowCreateTasksButton] = useState(true);
+  const [showRenewButton, setShowRenewButton] = useState(false);
+  const [showCreateNextButton, setShowCreateNextButton] = useState(false);
+  const [hasCreatedTasks, setHasCreatedTasks] = useState(false);
+
+  const [creatingPosting, setCreatingPosting] = useState(false);
+
+  // Task stats calculation
+  const taskStats: TaskStats = useMemo(() => {
+    const total = tasks.length;
+    const completed = tasks.filter(
+      (t) => t.status === "completed" || t.status === "qc_approved"
+    ).length;
+    const pending = tasks.filter((t) => t.status === "pending").length;
+    const inProgress = tasks.filter((t) => t.status === "in_progress").length;
+    const overdue = tasks.filter((t) => {
+      if (!t.dueDate) return false;
+      return (
+        new Date(t.dueDate) < new Date() &&
+        (t.status === "pending" || t.status === "in_progress")
+      );
+    }).length;
+
+    return {
+      total,
+      completed,
+      pending,
+      inProgress,
+      overdue,
+      dataEntryCompleted: statsData?.dataEntryCompleted || 0,
+      last7Days: statsData?.last7Days || 0,
+      last30Days: statsData?.last30Days || 0,
+      byStatus: {},
+      byPriority: {},
+    };
+  }, [tasks, statsData]);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Pre-indexed filtering using deferred search
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
+
+    if (deferredSearch.trim()) {
+      const query = deferredSearch.toLowerCase().trim();
+      result = result.filter((t) =>
+        [t.name, t.category?.name || "", t.priority || "", t.status || ""].some(
+          (s) => String(s).toLowerCase().includes(query)
+        )
+      );
+    }
+
+    if (statusFilter !== "all") {
+      result = result.filter((t) => t.status === statusFilter);
+    }
+
+    if (priorityFilter !== "all") {
+      result = result.filter((t) => t.priority === priorityFilter);
+    }
+
+    return result;
+  }, [tasks, deferredSearch, statusFilter, priorityFilter]);
+
+  // Simple client-side pagination
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredTasks.length / pageSize));
+  }, [filteredTasks.length, pageSize]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(1);
+  }, [page, totalPages]);
+
+  const paginatedTasks = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    const slice = filteredTasks.slice(start, start + pageSize);
+
+    const now = Date.now();
+    return slice.map((t) => {
+      const dueDateObj = t.dueDate ? new Date(t.dueDate) : null;
+      const dueDateFormatted =
+        dueDateObj && !isNaN(dueDateObj.getTime())
+          ? format(dueDateObj, "MMM dd, yyyy")
+          : null;
+      const isOverdue = !!(
+        dueDateObj &&
+        dueDateObj.getTime() < now &&
+        (t.status === "pending" || t.status === "in_progress")
+      );
+      return { task: t, dueDateFormatted, isOverdue };
+    });
+  }, [filteredTasks, page, pageSize]);
 
   // Check if posting tasks already exist
   const hasPostingTasks = useMemo(
@@ -623,11 +781,10 @@ export default function DataEntryCompleteTasksPanel({
   );
 
   // Gate readiness by required categories fully QC-approved
-  const requiredCategories = [
-    "Social Assets Creation",
-    "Web2 Creation",
-    "Additional Assets Creation",
-  ];
+  const requiredCategories = useMemo(
+    () => ["Social Assets Creation", "Web2 Creation", "Additional Assets Creation"],
+    []
+  );
 
   const isReadyForPostingCreation = useMemo(() => {
     if (!tasks || tasks.length === 0) return false;
@@ -638,7 +795,7 @@ export default function DataEntryCompleteTasksPanel({
       if (inCat.length === 0) return false;
       return inCat.every((t) => t.status === "qc_approved");
     });
-  }, [tasks]);
+  }, [tasks, requiredCategories]);
 
   // Count tasks completed by the current Data Entry user
   const dataEntryCompletedCount = useMemo(() => {
@@ -997,134 +1154,11 @@ export default function DataEntryCompleteTasksPanel({
     }
   }, []);
 
-  // Helper functions
-  const isSimpleTask = useCallback((task: DETask | null) => {
-    if (!task?.category?.name) return false;
-    const simpleCategories = [
-      "Social Activity",
-      "Blog Posting",
-      "Image Optimization",
-      "Content Studio",
-    ];
-    return simpleCategories.includes(task.category.name);
-  }, []);
-
-  const isContentWritingTask = useCallback((task: DETask | null) => {
-    if (!task?.category?.name) return false;
-    const contentWritingCategories = ["Content Writing", "Guest Posting"];
-    return contentWritingCategories.some((cat) =>
-      task.category?.name?.toLowerCase().includes(cat.toLowerCase())
-    );
-  }, []);
-
-  const isReviewRemovalTask = useCallback((task: DETask | null) => {
-    if (!task?.category) return false;
-    const nameLc = (task.category.name || "").toLowerCase();
-    const idLc = (task.category.id || "").toLowerCase();
-    return (
-      nameLc.includes("review removal") ||
-      nameLc === "review_removal" ||
-      idLc.includes("review_removal")
-    );
-  }, []);
-
-  const isBacklinkingTask = useCallback((task: DETask | null) => {
-    if (!task?.category) return false;
-    const nameLc = (task.category.name || "").toLowerCase();
-    const idLc = (task.category.id || "").toLowerCase();
-    return nameLc.includes("backlinks") || idLc.includes("backlinks");
-  }, []);
-
-  const isSummaryReportTask = useCallback((task: DETask | null) => {
-    if (!task?.category) return false;
-    const nameLc = (task.category.name || "").toLowerCase();
-    const idLc = (task.category.id || "").toLowerCase();
-    return (
-      nameLc.includes("summary report") ||
-      nameLc === "summary_report" ||
-      idLc.includes("summary_report")
-    );
-  }, []);
-
-  const isMonitoringTask = useCallback((task: DETask | null) => {
-    if (!task?.category) return false;
-    const nameLc = (task.category.name || "").toLowerCase();
-    const idLc = (task.category.id || "").toLowerCase();
-    return nameLc.includes("monitoring") || idLc.includes("monitoring");
-  }, []);
-
-  // Function to extract username from URL
-  const extractUsernameFromUrl = useCallback((url: string): string => {
-    try {
-      const urlObj = new URL(url);
-      const pathSegments = urlObj.pathname
-        .split("/")
-        .filter((segment) => segment.length > 0);
-
-      for (let i = 0; i < pathSegments.length; i++) {
-        const segment = pathSegments[i];
-        if (
-          [
-            "user",
-            "profile",
-            "account",
-            "users",
-            "profiles",
-            "accounts",
-            "dashboard",
-            "settings",
-            "admin",
-            "api",
-            "auth",
-            "login",
-            "signup",
-            "register",
-          ].includes(segment.toLowerCase())
-        ) {
-          if (i + 1 < pathSegments.length) {
-            const nextSegment = pathSegments[i + 1];
-            if (/^[a-zA-Z0-9._-]{3,30}$/.test(nextSegment)) {
-              return nextSegment;
-            }
-          }
-        }
-        if (/^[a-zA-Z0-9._-]{3,30}$/.test(segment)) {
-          return segment;
-        }
-      }
-
-      const searchParams = urlObj.searchParams;
-      if (
-        searchParams.has("user") ||
-        searchParams.has("username") ||
-        searchParams.has("profile") ||
-        searchParams.has("u")
-      ) {
-        return (
-          searchParams.get("user") ||
-          searchParams.get("username") ||
-          searchParams.get("profile") ||
-          searchParams.get("u") ||
-          ""
-        );
-      }
-
-      const fragment = urlObj.hash.substring(1);
-      if (fragment && /^[a-zA-Z0-9._-]{3,30}$/.test(fragment)) {
-        return fragment;
-      }
-
-      return "";
-    } catch {
-      return "";
-    }
-  }, []);
-
   return (
     <div className="space-y-6">
-      {/* Statistics Grid - Modern Elegant Design */}
+      {/* Statistics Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-        {/* Total Tasks Card - Redesigned */}
+        {/* Total Tasks Card */}
         <Card className="group relative overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-indigo-600 via-blue-600 to-purple-700 hover:shadow-indigo-500/50 transition-all duration-500 hover:scale-105">
           <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
           <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-3 pt-6">
@@ -1146,7 +1180,7 @@ export default function DataEntryCompleteTasksPanel({
           </CardContent>
         </Card>
 
-        {/* Completed Tasks Card - Redesigned */}
+        {/* Completed Tasks Card */}
         <Card className="group relative overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-emerald-500 via-green-600 to-teal-700 hover:shadow-emerald-500/50 transition-all duration-500 hover:scale-105">
           <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
           <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-3 pt-6">
@@ -1170,7 +1204,7 @@ export default function DataEntryCompleteTasksPanel({
           </CardContent>
         </Card>
 
-        {/* Overdue Tasks Card - Redesigned */}
+        {/* Overdue Tasks Card */}
         <Card className="group relative overflow-hidden border-0 shadow-2xl bg-gradient-to-br from-orange-500 via-amber-600 to-red-600 hover:shadow-orange-500/50 transition-all duration-500 hover:scale-105">
           <div className="absolute inset-0 bg-white/10 backdrop-blur-sm" />
           <CardHeader className="relative flex flex-row items-center justify-between space-y-0 pb-3 pt-6">
@@ -1195,7 +1229,7 @@ export default function DataEntryCompleteTasksPanel({
         </Card>
       </div>
 
-      {/* Tasks Panel - Redesigned with Glassmorphism */}
+      {/* Tasks Panel */}
       <Card className="border-0 shadow-2xl overflow-hidden backdrop-blur-xl bg-white/95">
         <CardHeader className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white py-8 px-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
@@ -1293,7 +1327,7 @@ export default function DataEntryCompleteTasksPanel({
         </CardHeader>
 
         <CardContent className="p-8">
-          {/* Filters and Search - Enhanced Design */}
+          {/* Filters and Search */}
           <div className="flex flex-col md:flex-row gap-6 mb-8">
             <div className="relative flex-1">
               <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-indigo-500">
@@ -1308,7 +1342,7 @@ export default function DataEntryCompleteTasksPanel({
             </div>
           </div>
 
-          {/* Tasks Table - Modern Professional Design */}
+          {/* Tasks Table */}
           <div className="border-2 border-slate-200 rounded-3xl overflow-hidden shadow-lg bg-white">
             <div className="overflow-x-auto">
               <table className="min-w-full">
@@ -1397,7 +1431,7 @@ export default function DataEntryCompleteTasksPanel({
                 </tbody>
               </table>
             </div>
-            {/* Pagination controls - keep DOM small by paginating large lists */}
+            {/* Pagination controls */}
             <div className="mt-4 px-4 flex items-center justify-between">
               <div className="text-sm text-slate-600">
                 Showing{" "}
@@ -1468,6 +1502,7 @@ export default function DataEntryCompleteTasksPanel({
         </CardContent>
       </Card>
 
+      {/* Completion Dialog */}
       <Suspense fallback={<div>Loading...</div>}>
         <LazyCompletionDialog
           selected={selected}
@@ -1525,6 +1560,7 @@ export default function DataEntryCompleteTasksPanel({
         />
       </Suspense>
 
+      {/* Backlinking Modal */}
       <Suspense fallback={<div>Loading...</div>}>
         <LazyBacklinkingModal
           open={backlinkingModalOpen}
@@ -1537,6 +1573,8 @@ export default function DataEntryCompleteTasksPanel({
           }}
         />
       </Suspense>
+
+      {/* Summary Report Modal */}
       <Suspense fallback={<div>Loading...</div>}>
         <LazySummaryReportModal
           open={summaryReportModalOpen}
@@ -1549,6 +1587,7 @@ export default function DataEntryCompleteTasksPanel({
           }}
         />
       </Suspense>
+
       {/* Monitoring Dialog */}
       <Suspense fallback={<div>Loading...</div>}>
         <LazyMonitoringDialog
