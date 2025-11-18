@@ -138,8 +138,6 @@ export function AmGroupedClientView({
   const [expandedManual, setExpandedManual] = useState<Record<string, boolean>>(
     {}
   );
-  const [hovered, setHovered] = useState<Record<string, boolean>>({});
-  const hoverTimers = useRef<Record<string, number | undefined>>({});
 
   const defaultExpanded = useMemo(() => {
     const map: Record<string, boolean> = {};
@@ -149,44 +147,17 @@ export function AmGroupedClientView({
 
   const getIsExpanded = useCallback(
     (amId: string): boolean => {
-      if (typeof expandedManual[amId] === "boolean")
+      if (typeof expandedManual[amId] === "boolean") {
         return expandedManual[amId];
-      if (hovered[amId]) return true; // auto-open while hovered
+      }
       return defaultExpanded[amId] ?? false;
     },
-    [expandedManual, hovered, defaultExpanded]
+    [expandedManual, defaultExpanded]
   );
-
-  const clearTimer = (id: string) => {
-    const t = hoverTimers.current[id];
-    if (t) {
-      window.clearTimeout(t);
-      hoverTimers.current[id] = undefined;
-    }
-  };
-
-  const handleMouseEnter = (id: string) => {
-    clearTimer(id);
-    hoverTimers.current[id] = window.setTimeout(() => {
-      setHovered((h) => ({ ...h, [id]: true }));
-      hoverTimers.current[id] = undefined;
-    }, 80);
-  };
-
-  const handleMouseLeave = (id: string) => {
-    clearTimer(id);
-    hoverTimers.current[id] = window.setTimeout(() => {
-      if (!expandedManual[id]) {
-        setHovered((h) => ({ ...h, [id]: false }));
-      }
-      hoverTimers.current[id] = undefined;
-    }, 120);
-  };
 
   const toggleOpen = (id: string) => {
     setExpandedManual((s) => {
       const next = !getIsExpanded(id);
-      if (next) setHovered((h) => ({ ...h, [id]: true }));
       return { ...s, [id]: next };
     });
   };
@@ -284,7 +255,6 @@ export function AmGroupedClientView({
         const impersonateLabel =
           group.am.name || group.am.email || "Account Manager";
         const isOpen = getIsExpanded(amId);
-        const isHovered = hovered[amId] ?? false;
 
         // metrics
         const salesCount = group.clients.reduce(
@@ -329,12 +299,8 @@ export function AmGroupedClientView({
             className={`overflow-hidden rounded-xl border transition duration-300 ${
               isOpen
                 ? "border-cyan-300 bg-white shadow-xl"
-                : isHovered
-                ? "border-gray-200 bg-gray-50 shadow-lg"
-                : "border-gray-200 bg-white shadow-sm"
+                : "border-gray-200 bg-white shadow-sm hover:shadow-md"
             }`}
-            onMouseEnter={() => handleMouseEnter(amId)}
-            onMouseLeave={() => handleMouseLeave(amId)}
           >
             {/* Header */}
             <header
@@ -379,12 +345,7 @@ export function AmGroupedClientView({
                           axisLine={false}
                           tickLine={false}
                         />
-                        <YAxis
-                          allowDecimals={false}
-                          width={28}
-                          axisLine={false}
-                          tickLine={false}
-                        />
+                        <YAxis hide allowDecimals={false} width={0} />
                         <Tooltip content={<CustomTooltip />} />
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
                           {summaryData.map((entry, index) => (
