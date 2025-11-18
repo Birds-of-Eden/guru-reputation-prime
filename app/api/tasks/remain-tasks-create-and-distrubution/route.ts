@@ -80,7 +80,9 @@ function resolveCategoryFromType(assetType?: SiteAssetType | null): string {
 }
 
 function baseNameOf(name: string): string {
-  return String(name).replace(/\s*-\s*\d+$/i, "").trim();
+  return String(name)
+    .replace(/\s*-\s*\d+$/i, "")
+    .trim();
 }
 
 function safeErr(err: unknown) {
@@ -132,7 +134,8 @@ function addDays(startDate: Date, days: number): Date {
 function monthsBetweenInclusive(d1: Date, d2: Date): number {
   const a = new Date(d1.getFullYear(), d1.getMonth(), 1);
   const b = new Date(d2.getFullYear(), d2.getMonth(), 1);
-  const diff = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  const diff =
+    (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
   return Math.max(diff + 1, 0);
 }
 
@@ -243,7 +246,10 @@ export async function POST(req: NextRequest) {
     const assigneeIdRaw: string | undefined = body?.assigneeId;
 
     if (!clientId) {
-      return NextResponse.json({ message: "clientId is required" }, { status: 400 });
+      return NextResponse.json(
+        { message: "clientId is required" },
+        { status: 400 }
+      );
     }
 
     // DB preflight
@@ -262,7 +268,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let assignedAgent = topAgent as { id: string; name: string | null; email: string | null };
+    let assignedAgent = topAgent as {
+      id: string;
+      name: string | null;
+      email: string | null;
+    };
     if (assigneeIdRaw) {
       try {
         const candidate = await prisma.user.findUnique({
@@ -280,22 +290,40 @@ export async function POST(req: NextRequest) {
       where: { id: clientId },
       select: { id: true, startDate: true, dueDate: true },
     });
-    if (!client) return NextResponse.json({ message: "Client not found" }, { status: 404 });
-    if (!client.startDate) return NextResponse.json({ message: "Client start date is required" }, { status: 400 });
-    if (!client.dueDate) return NextResponse.json({ message: "Client due date is required" }, { status: 400 });
+    if (!client)
+      return NextResponse.json(
+        { message: "Client not found" },
+        { status: 404 }
+      );
+    if (!client.startDate)
+      return NextResponse.json(
+        { message: "Client start date is required" },
+        { status: 400 }
+      );
+    if (!client.dueDate)
+      return NextResponse.json(
+        { message: "Client due date is required" },
+        { status: 400 }
+      );
 
     const startDate = new Date(client.startDate);
     const dueDate = new Date(client.dueDate);
 
     const today = new Date();
-    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayMidnight = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
 
     // Assignment & source
     const templateId = templateIdRaw === "none" ? null : templateIdRaw;
     const assignment = await prisma.assignment.findFirst({
       where: {
         clientId,
-        ...(templateId !== undefined ? { templateId: templateId ?? undefined } : {}),
+        ...(templateId !== undefined
+          ? { templateId: templateId ?? undefined }
+          : {}),
       },
       orderBy: { assignedAt: "desc" },
       select: { id: true },
@@ -314,7 +342,9 @@ export async function POST(req: NextRequest) {
         status: "qc_approved",
         templateSiteAsset: {
           is: {
-            ...(onlyType ? { type: onlyType } : { type: { in: ALLOWED_ASSET_TYPES } }),
+            ...(onlyType
+              ? { type: onlyType }
+              : { type: { in: ALLOWED_ASSET_TYPES } }),
           },
         },
       },
@@ -329,26 +359,44 @@ export async function POST(req: NextRequest) {
         username: true,
         notes: true,
         templateSiteAsset: {
-          select: { id: true, type: true, name: true, defaultPostingFrequency: true },
+          select: {
+            id: true,
+            type: true,
+            name: true,
+            defaultPostingFrequency: true,
+          },
         },
       },
     });
 
     if (!sourceTasks.length) {
       return NextResponse.json(
-        { message: "No qc_approved source tasks found to copy.", created: 0, tasks: [] },
+        {
+          message: "No qc_approved source tasks found to copy.",
+          created: 0,
+          tasks: [],
+        },
         { status: 200 }
       );
     }
 
     // Ensure categories
     const ensureCategory = async (name: string) => {
-      const found = await prisma.taskCategory.findFirst({ where: { name }, select: { id: true, name: true } });
+      const found = await prisma.taskCategory.findFirst({
+        where: { name },
+        select: { id: true, name: true },
+      });
       if (found) return found;
       try {
-        return await prisma.taskCategory.create({ data: { name }, select: { id: true, name: true } });
+        return await prisma.taskCategory.create({
+          data: { name },
+          select: { id: true, name: true },
+        });
       } catch {
-        const again = await prisma.taskCategory.findFirst({ where: { name }, select: { id: true, name: true } });
+        const again = await prisma.taskCategory.findFirst({
+          where: { name },
+          select: { id: true, name: true },
+        });
         if (again) return again;
         throw new Error(`Failed to ensure category: ${name}`);
       }
@@ -364,8 +412,12 @@ export async function POST(req: NextRequest) {
       CAT_REVIEW_REMOVAL,
       CAT_SUMMARY_REPORT,
     ];
-    const ensured = await Promise.all(ALL_CATEGORY_NAMES.map((n) => ensureCategory(n)));
-    const categoryIdByName = new Map<string, string>(ensured.map((c) => [c.name, c.id] as const));
+    const ensured = await Promise.all(
+      ALL_CATEGORY_NAMES.map((n) => ensureCategory(n))
+    );
+    const categoryIdByName = new Map<string, string>(
+      ensured.map((c) => [c.name, c.id] as const)
+    );
 
     // Web2 creds for SC
     const web2PlatformCreds = collectWeb2PlatformSources(sourceTasks as any);
@@ -379,20 +431,24 @@ export async function POST(req: NextRequest) {
     };
 
     // 👇 NEW: per-month capped schedule builder (+7WD cycles), starting from last task or today
-    function* cadenceDates(from: Date, end: Date, lastTaskDueDate: Date | null) {
+    function* cadenceDates(
+      from: Date,
+      end: Date,
+      lastTaskDueDate: Date | null
+    ) {
       let cur: Date;
-      
+
       if (lastTaskDueDate && lastTaskDueDate >= from) {
-        // Continue from last task with 7WD cycle
+        // Existing tasks → continue 7WD cycle
         cur = addWorkingDays(lastTaskDueDate, 7);
       } else {
-        // No previous tasks or last task is before 'from', start from today + 7WD
-        cur = addWorkingDays(from, 7);
+        // FIRST task only → today/startDate + 1WD
+        cur = addWorkingDays(from, 1);
       }
-      
+
       if (cur > end) return;
       yield cur;
-      
+
       while (true) {
         cur = addWorkingDays(cur, 7);
         if (cur > end) break;
@@ -425,17 +481,22 @@ export async function POST(req: NextRequest) {
         select: { name: true, dueDate: true },
         orderBy: { dueDate: "desc" },
       });
-      
+
       // Find the last task's due date for this source
-      const lastTaskDueDate = existingTasksForSource.length > 0 && existingTasksForSource[0].dueDate
-        ? new Date(existingTasksForSource[0].dueDate)
-        : null;
+      const lastTaskDueDate =
+        existingTasksForSource.length > 0 && existingTasksForSource[0].dueDate
+          ? new Date(existingTasksForSource[0].dueDate)
+          : null;
 
       const customOffsets = CUSTOM_SCHEDULE_OFFSETS[catName];
       if (customOffsets) {
         const customDates = customOffsets
           .map((offset) => addDays(startDate, offset))
-          .filter((date) => date.getTime() > todayMidnight.getTime() && date.getTime() <= dueDate.getTime());
+          .filter(
+            (date) =>
+              date.getTime() > todayMidnight.getTime() &&
+              date.getTime() <= dueDate.getTime()
+          );
 
         customDates.forEach((dueDateForTask, idx) => {
           const seqIndex = existingTasksForSource.length + idx + 1;
@@ -452,7 +513,8 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const freqPerMonthRaw = src.templateSiteAsset?.defaultPostingFrequency ?? 1;
+      const freqPerMonthRaw =
+        src.templateSiteAsset?.defaultPostingFrequency ?? 1;
       const freqPerMonth = Math.max(1, Number(freqPerMonthRaw) || 1);
 
       // Calculate total months remaining (from today to dueDate)
@@ -468,7 +530,10 @@ export async function POST(req: NextRequest) {
       for (const d of cadenceDates(todayMidnight, dueDate, lastTaskDueDate)) {
         if (d > dueDate) break;
 
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          "0"
+        )}`;
         const used = perMonthCount.get(key) ?? 0;
 
         if (used < freqPerMonth) {
@@ -493,7 +558,8 @@ export async function POST(req: NextRequest) {
     if (future.length === 0) {
       return NextResponse.json(
         {
-          message: "No remaining occurrences fall within the requested window (today+15WD to dueDate).",
+          message:
+            "No remaining occurrences fall within the requested window (today+15WD to dueDate).",
           created: 0,
           assignedTo: assignedAgent,
           tasks: [],
@@ -560,10 +626,12 @@ export async function POST(req: NextRequest) {
       )
     );
 
-    const scNames = socialBases.map((b) => `${b} - ${CAT_SOCIAL_COMMUNICATION}`);
-    const web2SCNames = WEB2_FIXED_PLATFORMS
-      .filter((p) => web2PlatformCreds.get(p))
-      .map((p) => `${PLATFORM_META[p].label} - ${CAT_SOCIAL_COMMUNICATION}`);
+    const scNames = socialBases.map(
+      (b) => `${b} - ${CAT_SOCIAL_COMMUNICATION}`
+    );
+    const web2SCNames = WEB2_FIXED_PLATFORMS.filter((p) =>
+      web2PlatformCreds.get(p)
+    ).map((p) => `${PLATFORM_META[p].label} - ${CAT_SOCIAL_COMMUNICATION}`);
 
     const scExisting = await prisma.task.findMany({
       where: {
@@ -582,13 +650,15 @@ export async function POST(req: NextRequest) {
         const scName = `${base} - ${CAT_SOCIAL_COMMUNICATION}`;
         if (scSkip.has(scName)) continue;
         const src = sourceTasks.find(
-          (s) => s.templateSiteAsset?.type === "social_site" && baseNameOf(s.name) === base
+          (s) =>
+            s.templateSiteAsset?.type === "social_site" &&
+            baseNameOf(s.name) === base
         );
         payloads.push({
           id: makeId(),
           name: scName,
           status: "pending",
-          priority: overridePriority ?? (src?.priority ?? "medium"),
+          priority: overridePriority ?? src?.priority ?? "medium",
           dueDate: latestDue.toISOString(),
           completionLink: src?.completionLink ?? undefined,
           email: src?.email ?? undefined,
@@ -673,7 +743,8 @@ export async function POST(req: NextRequest) {
         created: created.length,
         assignedTo: assignedAgent,
         assignmentId: assignment.id,
-        cadence: "first at today + 15 working days, then every +7 working days (per-month capped)",
+        cadence:
+          "first at today + 15 working days, then every +7 working days (per-month capped)",
         tasks: created,
       },
       { status: 201 }
