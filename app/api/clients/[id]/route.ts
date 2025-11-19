@@ -150,6 +150,7 @@ function buildClientSelect(compact: boolean): Prisma.ClientSelect {
         createdAt: true,
         completedAt: true,
         completionLink: true,
+        taskCompletionJson: true,
         idealDurationMinutes: true,
         categoryId: true,
         templateSiteAssetId: true,
@@ -207,7 +208,9 @@ export async function GET(
         where: { id },
         select: buildClientSelect(isDistributionView),
       }),
-      isDistributionView ? Promise.resolve(null) : recalcAndStoreClientProgress(id),
+      isDistributionView
+        ? Promise.resolve(null)
+        : recalcAndStoreClientProgress(id),
     ]);
 
     if (!client)
@@ -343,8 +346,28 @@ export async function PUT(
           },
         },
         tasks: {
-          include: {
-            assignedTo: { include: { role: true } },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            priority: true,
+            dueDate: true,
+            createdAt: true,
+            completedAt: true,
+            completionLink: true,
+            taskCompletionJson: true,
+            idealDurationMinutes: true,
+            categoryId: true,
+            templateSiteAssetId: true,
+            assignedToId: true,
+            assignedTo: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: { select: { id: true, name: true } },
+              },
+            },
             templateSiteAsset: true,
             category: true,
           },
@@ -363,7 +386,25 @@ export async function PUT(
               },
             },
             siteAssetSettings: { include: { templateSiteAsset: true } },
-            tasks: { include: { assignedTo: true, templateSiteAsset: true } },
+            tasks: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                priority: true,
+                dueDate: true,
+                createdAt: true,
+                completedAt: true,
+                completionLink: true,
+                taskCompletionJson: true,
+                idealDurationMinutes: true,
+                categoryId: true,
+                templateSiteAssetId: true,
+                assignedToId: true,
+                assignedTo: { select: { id: true, name: true, email: true } },
+                templateSiteAsset: true,
+              },
+            },
           },
         },
       },
@@ -546,25 +587,25 @@ export async function POST(
       }
 
       try {
-  const authUser = await getAuthUser(); // ✅ ইউজার বের করো
+        const authUser = await getAuthUser(); // ✅ ইউজার বের করো
 
-  await tx.activityLog.create({
-    data: {
-      id: crypto.randomUUID(),
-      entityType: "Client",
-      entityId: clientId,
-      userId: authUser?.id || null, // ✅ ইউজারের id ব্যবহার করো
-      action: "upgrade_package",
-      details: {
-        newPackageId,
-        templateId: selectedTemplateId,
-        createdAssignments: !!createAssignments,
-      },
-    },
-  });
-} catch (err) {
-  console.error("Activity log failed:", err);
-}
+        await tx.activityLog.create({
+          data: {
+            id: crypto.randomUUID(),
+            entityType: "Client",
+            entityId: clientId,
+            userId: authUser?.id || null, // ✅ ইউজারের id ব্যবহার করো
+            action: "upgrade_package",
+            details: {
+              newPackageId,
+              templateId: selectedTemplateId,
+              createdAssignments: !!createAssignments,
+            },
+          },
+        });
+      } catch (err) {
+        console.error("Activity log failed:", err);
+      }
     });
 
     // Note: Template does not have default duration in schema. We'll use
@@ -1028,8 +1069,28 @@ export async function POST(
           },
         },
         tasks: {
-          include: {
-            assignedTo: { include: { role: true } },
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            priority: true,
+            dueDate: true,
+            createdAt: true,
+            completedAt: true,
+            completionLink: true,
+            taskCompletionJson: true,
+            idealDurationMinutes: true,
+            categoryId: true,
+            templateSiteAssetId: true,
+            assignedToId: true,
+            assignedTo: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: { select: { id: true, name: true } },
+              },
+            },
             templateSiteAsset: true,
             category: true,
           },
@@ -1048,7 +1109,25 @@ export async function POST(
               },
             },
             siteAssetSettings: { include: { templateSiteAsset: true } },
-            tasks: { include: { assignedTo: true, templateSiteAsset: true } },
+            tasks: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                priority: true,
+                dueDate: true,
+                createdAt: true,
+                completedAt: true,
+                completionLink: true,
+                taskCompletionJson: true,
+                idealDurationMinutes: true,
+                categoryId: true,
+                templateSiteAssetId: true,
+                assignedToId: true,
+                assignedTo: { select: { id: true, name: true, email: true } },
+                templateSiteAsset: true,
+              },
+            },
           },
         },
       },
@@ -1073,40 +1152,3 @@ export async function POST(
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

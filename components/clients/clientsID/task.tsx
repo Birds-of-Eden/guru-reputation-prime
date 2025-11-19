@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
 // ---------- Small UI Helpers ----------
 const Pill = ({ children }: { children: React.ReactNode }) => (
