@@ -520,7 +520,56 @@ export default function TaskDistributionForClient() {
     }
 
     const result = await response.json();
+    
+    // Refresh the data after reassignment
+    await mutateTasks();
+    
     return result;
+  };
+
+  // Refresh function to update data after unassign
+  const refreshData = async () => {
+    await mutateTasks();
+    await mutateTeamAgents();
+    await mutateAllAgents();
+  };
+
+  // Handle unassign functionality
+  const handleUnassign = async (taskIds: string[]) => {
+    try {
+      // Use the existing PUT endpoint for reassignments with null agentId
+      const response = await fetch("/api/tasks/distribute", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          reassignments: taskIds.map((taskId) => ({
+            taskId,
+            toAgentId: null,
+            reassignNotes: "Unassigned via Un-Assign button",
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to unassign tasks");
+      }
+
+      const result = await response.json();
+      
+      // Show success toast
+      toast.success(`Successfully unassigned ${taskIds.length} task${taskIds.length > 1 ? 's' : ''}`);
+      
+      // Refresh the data after unassign
+      await refreshData();
+      
+      return result;
+    } catch (error) {
+      // Show error toast
+      toast.error(`Failed to unassign tasks: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
   };
 
   // -------- Derived / helpers --------
@@ -1152,10 +1201,12 @@ export default function TaskDistributionForClient() {
                     onTaskAssignment={handleTaskAssignment}
                     onNoteChange={handleNoteChange}
                     onViewModeChange={setViewMode}
-                    // ✅ NEW: Pass modal handlers from parent
+                    // ✅ NEW: Modal props from parent
                     isReassignModalOpen={isReassignModalOpen}
                     onReassignModalOpen={setIsReassignModalOpen}
                     onReassign={handleReassign}
+                    onUnassign={handleUnassign}
+                    onRefresh={refreshData}
                     selectedTaskObjects={selectedTaskObjects}
                   />
                 ) : (
@@ -1181,6 +1232,8 @@ export default function TaskDistributionForClient() {
                     isReassignModalOpen={isReassignModalOpen}
                     onReassignModalOpen={setIsReassignModalOpen}
                     onReassign={handleReassign}
+                    onUnassign={handleUnassign}
+                    onRefresh={refreshData}
                     selectedTaskObjects={selectedTaskObjects}
                   />
                 )}

@@ -150,10 +150,10 @@ export async function PUT(request: Request) {
     }
 
     // ---------- SINGLE-TASK SHAPE ----------
-    if (body.taskId && body.newAgentId) {
+    if (body.taskId && (body.newAgentId !== undefined)) {
       const { taskId, newAgentId, reassignNotes } = body as {
         taskId: string;
-        newAgentId: string;
+        newAgentId: string | null;
         reassignNotes?: string;
       };
 
@@ -194,8 +194,8 @@ export async function PUT(request: Request) {
             id: `log_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
             entityType: "Task",
             entityId: taskId,
-            userId: toAgentId,
-            action: "task_reassigned",
+            userId: toAgentId, // This will be null for unassigned tasks
+            action: toAgentId ? "task_reassigned" : "task_unassigned",
             details: {
               clientId,
               reassignedAt: new Date().toISOString(),
@@ -219,31 +219,41 @@ export async function PUT(request: Request) {
               data: { assignedTasks: { decrement: 1 } },
             });
           }
-          await tx.clientTeamMember.upsert({
-            where: { clientId_agentId: { clientId, agentId: toAgentId } },
-            update: { assignedTasks: { increment: 1 } },
-            create: {
-              clientId,
-              agentId: toAgentId,
-              assignedTasks: 1,
-              assignedDate: new Date(),
-            },
-          });
+          // Only increment counter if toAgentId is not null (i.e., assigning to someone)
+          if (toAgentId) {
+            await tx.clientTeamMember.upsert({
+              where: { clientId_agentId: { clientId, agentId: toAgentId } },
+              update: { assignedTasks: { increment: 1 } },
+              create: {
+                clientId,
+                agentId: toAgentId,
+                assignedTasks: 1,
+                assignedDate: new Date(),
+              },
+            });
+          }
         }
       });
 
       // ... existing notification logic ...
-      const notifs: Promise<any>[] = [
-        prisma.notification.create({
-          data: {
-            userId: toAgentId,
-            taskId,
-            type: "general",
-            message: "A task has been reassigned to you.",
-            createdAt: new Date(),
-          },
-        }),
-      ];
+      const notifs: Promise<any>[] = [];
+      
+      // Only create notification for the new assignee if toAgentId is not null
+      if (toAgentId) {
+        notifs.push(
+          prisma.notification.create({
+            data: {
+              userId: toAgentId,
+              taskId,
+              type: "general",
+              message: "A task has been reassigned to you.",
+              createdAt: new Date(),
+            },
+          })
+        );
+      }
+      
+      // Always notify the previous assignee if they exist and are different from the new assignee
       if (fromAgentId && fromAgentId !== toAgentId) {
         notifs.push(
           prisma.notification.create({
@@ -251,7 +261,9 @@ export async function PUT(request: Request) {
               userId: fromAgentId,
               taskId,
               type: "general",
-              message: "A task previously assigned to you has been reassigned.",
+              message: toAgentId 
+                ? "A task previously assigned to you has been reassigned."
+                : "A task previously assigned to you has been unassigned.",
               createdAt: new Date(),
             },
           })
@@ -315,8 +327,8 @@ export async function PUT(request: Request) {
                   .slice(2, 9)}`,
                 entityType: "Task",
                 entityId: taskId,
-                userId: toAgentId,
-                action: "task_reassigned",
+                userId: toAgentId, // This will be null for unassigned tasks
+                action: toAgentId ? "task_reassigned" : "task_unassigned",
                 details: {
                   clientId,
                   reassignedAt: new Date().toISOString(),
@@ -338,7 +350,10 @@ export async function PUT(request: Request) {
             if (previous && previous !== toAgentId) {
               deltaMap.set(previous, (deltaMap.get(previous) ?? 0) - 1);
             }
-            deltaMap.set(toAgentId, (deltaMap.get(toAgentId) ?? 0) + 1);
+            // Only increment for non-null toAgentId (i.e., when assigning to someone)
+            if (toAgentId) {
+              deltaMap.set(toAgentId, (deltaMap.get(toAgentId) ?? 0) + 1);
+            }
           }
 
           const increments = Array.from(deltaMap.entries()).filter(

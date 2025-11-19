@@ -231,7 +231,7 @@ export function TabContent({
                 )
               }
               disabled={tasks.length === 0}
-              className={`bg-gradient-to-r ${config.gradient} text-white border-0 font-bold px-6 py-2.5`}
+              className={`bg-gradient-to-r ${config.gradient} text-white hover:text-gray-100 border-0 font-bold px-6 py-2.5`}
             >
               ✅ Select All ({tasks.length})
             </Button>

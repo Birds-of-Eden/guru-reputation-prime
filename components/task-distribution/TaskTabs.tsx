@@ -13,6 +13,7 @@ import {
   TaskAssignment,
   Task,
 } from "./distribution-types";
+import { CiCircleRemove } from "react-icons/ci";
 
 /**
  * Agent shape enriched with load stats (optional).
@@ -57,7 +58,13 @@ interface TaskTabsProps {
   // ✅ NEW: Modal props from parent
   isReassignModalOpen: boolean;
   onReassignModalOpen: (open: boolean) => void;
-  onReassign: (taskIds: string[], newAgentId: string, dueDate?: Date) => Promise<void>;
+  onReassign: (
+    taskIds: string[],
+    newAgentId: string,
+    dueDate?: Date
+  ) => Promise<void>;
+  onUnassign: (taskIds: string[]) => Promise<void>;
+  onRefresh?: () => void; // NEW: Refresh callback
   selectedTaskObjects: Task[];
 }
 
@@ -100,6 +107,8 @@ export function TaskTabs({
   isReassignModalOpen,
   onReassignModalOpen,
   onReassign,
+  onUnassign,
+  onRefresh,
   selectedTaskObjects,
 }: TaskTabsProps) {
   const agentsWithLabels = useMemo(() => prepAgents(agents), [agents]);
@@ -108,6 +117,16 @@ export function TaskTabs({
     [teamAgents]
   );
   const allAgentsWithLabels = useMemo(() => prepAgents(allAgents), [allAgents]);
+
+  // Helper function to check if any selected tasks have QC APPROVED status
+  const hasQcApprovedTasks = () => {
+    if (!selectedTaskObjects || selectedTasks.size === 0) return false;
+    
+    return Array.from(selectedTasks).some(taskId => {
+      const task = selectedTaskObjects.find(t => t.id === taskId);
+      return task?.status === "qc_approved";
+    });
+  };
 
   // -----------------------------
   // SINGLE-TAB MODE (e.g., Graphics Design / Blog Posting / etc.)
@@ -124,15 +143,36 @@ export function TaskTabs({
             </h4>
           </div>
           {selectedTasks.size > 0 && (
-            <Button
-              onClick={() => onReassignModalOpen(true)}
-              variant="outline"
-              size="sm"
-              className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-0 font-bold shadow-lg hover:shadow-xl transition-all duration-300"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Reassign ({selectedTasks.size})
-            </Button>
+            <div className="flex gap-2">
+              {/* Hide Un-Assign button if any selected tasks have QC APPROVED status */}
+              {!hasQcApprovedTasks() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-sky-600 text-white hover:text-gray-200 border-0 font-bold shadow-lg hover:shadow-xl transition-all duration-300"
+                  onClick={async () => {
+                    const selectedTaskIds = Array.from(selectedTasks);
+                    await onUnassign(selectedTaskIds);
+                    // Refresh the data after unassign
+                    if (onRefresh) {
+                      onRefresh();
+                    }
+                  }}
+                >
+                  <CiCircleRemove /> Un-Assign
+                </Button>
+              )}
+
+              <Button
+                onClick={() => onReassignModalOpen(true)}
+                variant="outline"
+                size="sm"
+                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white hover:text-gray-200 border-0 font-bold shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reassign ({selectedTasks.size})
+              </Button>
+            </div>
           )}
         </div>
 
@@ -260,12 +300,31 @@ export function TaskTabs({
 
           {/* Reassign Button for 3-tab mode */}
           {selectedTasks.size > 0 && (
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex justify-end gap-2">
+              {/* Hide Un-Assign button if any selected tasks have QC APPROVED status */}
+              {!hasQcApprovedTasks() && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-gradient-to-r from-sky-500 to-blue-500 hover:from-sky-600 hover:to-sky-600 text-white hover:text-gray-200 border-0 font-bold shadow-lg hover:shadow-xl transition-all duration-300"
+                  onClick={async () => {
+                    const selectedTaskIds = Array.from(selectedTasks);
+                    await onUnassign(selectedTaskIds);
+                    // Refresh the data after unassign
+                    if (onRefresh) {
+                      onRefresh();
+                    }
+                  }}
+                >
+                  <CiCircleRemove /> Un-Assign
+                </Button>
+              )}
+
               <Button
                 onClick={() => onReassignModalOpen(true)}
                 variant="outline"
                 size="sm"
-                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-0 font-bold shadow-lg hover:shadow-xl transition-all duration-300"
+                className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white hover:text-white border-0 font-bold shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Reassign ({selectedTasks.size})
