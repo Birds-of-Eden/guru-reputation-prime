@@ -153,7 +153,11 @@ export function TemplateViewModal({
       web2_site: { icon: Globe, color: "green", label: "Web 2.0" },
       other_asset: { icon: FileText, color: "purple", label: "Assets" },
       graphics_design: { icon: Palette, color: "pink", label: "Design" },
-      image_optimization: { icon: Palette, color: "pink", label: "Image Optimization" },
+      image_optimization: {
+        icon: Palette,
+        color: "pink",
+        label: "Image Optimization",
+      },
       content_studio: { icon: Edit3, color: "indigo", label: "Content Studio" },
       content_writing: { icon: PenTool, color: "orange", label: "Writing" },
       backlinks: { icon: Link2, color: "teal", label: "Backlinks" },
@@ -169,8 +173,16 @@ export function TemplateViewModal({
         color: "amber",
         label: "Review Removal",
       },
-      summary_report: { icon: BarChart3, color: "gray", label: "Summary Reports" },
-      guest_posting: { icon: BarChart2, color: "gray", label: "Guest Postings" },
+      summary_report: {
+        icon: BarChart3,
+        color: "gray",
+        label: "Summary Reports",
+      },
+      guest_posting: {
+        icon: BarChart2,
+        color: "gray",
+        label: "Guest Postings",
+      },
     };
 
     return (
@@ -292,7 +304,13 @@ export function TemplateViewModal({
                     className="text-xs text-gray-500 hover:text-gray-700 truncate block"
                     title={site.url}
                   >
-                    {new URL(site.url).hostname}
+                    {(() => {
+                      try {
+                        return new URL(site.url).hostname;
+                      } catch {
+                        return site.url;
+                      }
+                    })()}
                   </a>
                 )}
               </div>
