@@ -23,6 +23,8 @@ export async function GET(
         updatedAt: true,
         notes: true,
         idealDurationMinutes: true,
+        qcTotalScore: true,
+        qcReview: true,
         templateSiteAsset: {
           select: {
             id: true,
