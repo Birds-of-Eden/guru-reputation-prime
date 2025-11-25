@@ -2,9 +2,15 @@
 
 "use client";
 
-import { memo, useState, useMemo, useCallback } from "react";
+import {
+  memo,
+  useState,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   FileText,
   Eye,
@@ -12,7 +18,6 @@ import {
   ListChecks,
   Trash2,
   ArrowUpCircle,
-  UserRoundCheck,
   Heart,
   Calendar,
 } from "lucide-react";
@@ -64,6 +69,7 @@ const ClientCardComponent = function ClientCard({
   const [isDeleting, setIsDeleting] = useState(false);
   const [openDanger, setOpenDanger] = useState(false);
   const [openUpgrade, setOpenUpgrade] = useState(false);
+  const prefetchedDetailUrlRef = useRef<string | null>(null);
 
   // ⚡ OPTIMIZED: Memoize utility functions
   const normalizeStatus = useCallback((raw?: string | null) => {
@@ -233,6 +239,24 @@ const ClientCardComponent = function ClientCard({
     return `/${segment}/clients/${client.id}`;
   }, [segment, client.id]);
 
+  const canViewDetails =
+    !permsLoading &&
+    hasPermissionClient(user?.permissions, "client_card_client_view");
+
+  const prefetchDetails = useCallback(() => {
+    if (prefetchedDetailUrlRef.current === detailUrl) return;
+    prefetchedDetailUrlRef.current = detailUrl;
+    router.prefetch(detailUrl).catch(() => {
+      prefetchedDetailUrlRef.current = null;
+    });
+  }, [router, detailUrl]);
+
+  useEffect(() => {
+    if (!canViewDetails) return;
+    const timer = window.setTimeout(prefetchDetails, 50);
+    return () => window.clearTimeout(timer);
+  }, [canViewDetails, prefetchDetails]);
+
   async function handleDelete() {
     setIsDeleting(true);
     const ok = await handleDeleteClient(client.id, swrKey);
@@ -244,10 +268,17 @@ const ClientCardComponent = function ClientCard({
     setIsDeleting(false);
   }
 
-  const handleViewDetails = useCallback(() => {
-    if (onViewDetails) return onViewDetails();
-    router.push(detailUrl);
-  }, [onViewDetails, router, detailUrl]);
+  const handleViewDetails = useCallback(
+    (event?: { preventDefault?: () => void }) => {
+      prefetchDetails();
+      if (onViewDetails) {
+        event?.preventDefault?.();
+        return onViewDetails();
+      }
+      router.push(detailUrl);
+    },
+    [onViewDetails, router, detailUrl, prefetchDetails]
+  );
 
   const handleViewTasks = () => {
     if (segment === "data_entry") {
@@ -445,20 +476,17 @@ const ClientCardComponent = function ClientCard({
       {/* Footer */}
       <CardFooter className="border-t border-gray-100 bg-gray-50 p-6">
         <div className="flex flex-wrap gap-3 w-full">
-          {!permsLoading &&
-            hasPermissionClient(
-              user?.permissions,
-              "client_card_client_view"
-            ) && (
-              <Button
-                asChild
-                className="flex-1 min-w-[150px] bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md rounded-lg px-5 py-2.5 transition-all duration-300"
-              >
-                <Link href={detailUrl} prefetch={true}>
-                  <Eye className="h-4 w-4 mr-2" /> View Details
-                </Link>
-              </Button>
-            )}
+          {canViewDetails && (
+            <Button
+              onClick={handleViewDetails}
+              onMouseEnter={prefetchDetails}
+              onFocus={prefetchDetails}
+              onTouchStart={prefetchDetails}
+              className="flex-1 min-w-[150px] bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-md rounded-lg px-5 py-2.5 transition-all duration-300"
+            >
+              <Eye className="h-4 w-4 mr-2" /> View Details
+            </Button>
+          )}
 
           {!permsLoading &&
             hasPermissionClient(
