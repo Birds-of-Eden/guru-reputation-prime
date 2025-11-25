@@ -246,9 +246,12 @@ const ClientCardComponent = function ClientCard({
   const prefetchDetails = useCallback(() => {
     if (prefetchedDetailUrlRef.current === detailUrl) return;
     prefetchedDetailUrlRef.current = detailUrl;
-    router.prefetch(detailUrl).catch(() => {
+    try {
+      // useRouter().prefetch may be undefined or sync; guard and ignore errors
+      (router as any)?.prefetch?.(detailUrl);
+    } catch {
       prefetchedDetailUrlRef.current = null;
-    });
+    }
   }, [router, detailUrl]);
 
   useEffect(() => {
