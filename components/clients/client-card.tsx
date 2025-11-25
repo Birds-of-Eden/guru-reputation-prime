@@ -256,8 +256,7 @@ const ClientCardComponent = function ClientCard({
 
   useEffect(() => {
     if (!canViewDetails) return;
-    const timer = window.setTimeout(prefetchDetails, 50);
-    return () => window.clearTimeout(timer);
+    prefetchDetails();
   }, [canViewDetails, prefetchDetails]);
 
   async function handleDelete() {
