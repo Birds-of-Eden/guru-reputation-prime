@@ -27,6 +27,9 @@ interface ClientDashboardProps {
 
 export function ClientDashboard({ clientData }: ClientDashboardProps) {
   const [activeTab, setActiveTab] = useState("profile");
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(
+    () => new Set(["profile"])
+  );
   const [editOpen, setEditOpen] = useState(false);
   const { user } = useUserSession();
   const roleName = (user as any)?.role?.name ?? (user as any)?.role ?? "";
@@ -34,14 +37,13 @@ export function ClientDashboard({ clientData }: ClientDashboardProps) {
   const isAgent = String(roleName).toLowerCase() === "agent";
   const isAdmin = String(roleName).toLowerCase().includes("admin");
 
-  // Safely derive package months (fallback 1)
+  // Basic derived fields (lightweight)
   const packageMonths =
     Number((clientData as any)?.package?.totalMonths) &&
     Number((clientData as any)?.package?.totalMonths) > 0
       ? Math.floor(Number((clientData as any)?.package?.totalMonths))
       : 1;
 
-  // Due date over? Strictly in the past
   const isDueOver = (() => {
     const due = clientData.dueDate ? new Date(clientData.dueDate) : null;
     if (!due || isNaN(due.getTime())) return false;
@@ -77,7 +79,7 @@ export function ClientDashboard({ clientData }: ClientDashboardProps) {
 
   // === FIXED: timezone-safe date formatter (uses DB string directly if YYYY-MM-DD) ===
   const formatDateStrict = (v?: string | Date | null) => {
-    if (!v) return "—";
+    if (!v) return "-";
     const monthNames = [
       "Jan",
       "Feb",
@@ -108,7 +110,7 @@ export function ClientDashboard({ clientData }: ClientDashboardProps) {
 
     // Fallback: parse and format using UTC components to avoid local offset issues
     const d = new Date(v as any);
-    if (isNaN(d.getTime())) return "—";
+    if (isNaN(d.getTime())) return "-";
     const y = d.getUTCFullYear();
     const mIdx = d.getUTCMonth();
     const day = d.getUTCDate();
@@ -251,6 +253,16 @@ export function ClientDashboard({ clientData }: ClientDashboardProps) {
 
   const totalAssets = totalTasks;
 
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+    setMountedTabs((prev) => {
+      if (prev.has(val)) return prev;
+      const next = new Set(prev);
+      next.add(val);
+      return next;
+    });
+  };
+
   return (
     <div>
       {/* Header Bar */}
@@ -360,7 +372,7 @@ export function ClientDashboard({ clientData }: ClientDashboardProps) {
       <div className="px-6 py-8">
         <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={handleTabChange}
           className="space-y-6"
         >
           <TabsList className="grid w-full grid-cols-8 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700">
@@ -448,37 +460,53 @@ export function ClientDashboard({ clientData }: ClientDashboardProps) {
             )}
           </div>
 
-          <TabsContent value="profile">
-            <Profile clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("profile") && (
+            <TabsContent value="profile">
+              <Profile clientData={clientData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="other-information">
-            <OtherInformation clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("other-information") && (
+            <TabsContent value="other-information">
+              <OtherInformation clientData={clientData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="bio">
-            <Bio clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("bio") && (
+            <TabsContent value="bio">
+              <Bio clientData={clientData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="drive-image">
-            <DriveImage clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("drive-image") && (
+            <TabsContent value="drive-image">
+              <DriveImage clientData={clientData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="article-topics">
-            <ArticleTopics clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("article-topics") && (
+            <TabsContent value="article-topics">
+              <ArticleTopics clientData={clientData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="social-profile">
-            <SocialProfile clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("social-profile") && (
+            <TabsContent value="social-profile">
+              <SocialProfile clientData={clientData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="template">
-            <TemplateManagement clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("template") && (
+            <TabsContent value="template">
+              <TemplateManagement clientData={clientData} />
+            </TabsContent>
+          )}
 
-          <TabsContent value="tasks">
-            <Tasks clientData={clientData} />
-          </TabsContent>
+          {mountedTabs.has("tasks") && (
+            <TabsContent value="tasks">
+              <Tasks clientData={clientData} />
+            </TabsContent>
+          )}
         </Tabs>
         <ClientEditModal
           open={editOpen}

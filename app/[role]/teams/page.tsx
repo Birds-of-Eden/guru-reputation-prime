@@ -40,7 +40,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
@@ -98,6 +97,9 @@ interface Team {
   templateTeamMembers: TeamMember[];
 }
 
+const getErrorMessage = (err: unknown, fallback: string) =>
+  err instanceof Error ? err.message : fallback;
+
 // Enhanced Team Card Component
 function TeamCard({
   team,
@@ -111,6 +113,13 @@ function TeamCard({
   onViewDetails: (team: Team) => void;
 }) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const openDeleteDialog = () => setIsDeleteDialogOpen(true);
+  const handleConfirmDelete = () => {
+    if (team.totalMembers > 0) return;
+    onDelete(team.id);
+    setIsDeleteDialogOpen(false);
+  };
 
   const getTeamColor = (teamName: string) => {
     const colors = [
@@ -209,9 +218,10 @@ function TeamCard({
         )}
 
         <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-gray-700">
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <Button
+                type="button"
                 variant="ghost"
                 className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
               >
@@ -236,46 +246,42 @@ function TeamCard({
                 Edit Team
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <AlertDialog
-                open={isDeleteDialogOpen}
-                onOpenChange={setIsDeleteDialogOpen}
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600 cursor-pointer"
+                onSelect={openDeleteDialog}
               >
-                <AlertDialogTrigger asChild>
-                  <DropdownMenuItem
-                    className="text-red-600 focus:text-red-600 cursor-pointer"
-                    onSelect={(e) => e.preventDefault()}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Team
-                  </DropdownMenuItem>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Are you absolutely sure?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete
-                      the team "{team.name}"
-                      {team.totalMembers > 0 &&
-                        ` and affect ${team.totalMembers} team member(s)`}
-                      .
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => onDelete(team.id)}
-                      className="bg-red-600 hover:bg-red-700"
-                      disabled={team.totalMembers > 0}
-                    >
-                      {team.totalMembers > 0 ? "Cannot Delete" : "Delete"}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Team
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <AlertDialog
+            open={isDeleteDialogOpen}
+            onOpenChange={setIsDeleteDialogOpen}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the
+                  team {team.name}
+                  {team.totalMembers > 0 &&
+                    ` and affect ${team.totalMembers} team member(s)`}
+                  .
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleConfirmDelete}
+                  className="bg-red-600 hover:bg-red-700"
+                  disabled={team.totalMembers > 0}
+                >
+                  {team.totalMembers > 0 ? "Cannot Delete" : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </CardContent>
     </Card>
@@ -425,9 +431,10 @@ function TeamListView({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <DropdownMenu>
+                  <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <Button
+                        type="button"
                         variant="ghost"
                         className="h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-800"
                       >
@@ -478,7 +485,7 @@ function TeamListView({
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the
-              team "{teamToDelete?.name}"
+              team {teamToDelete?.name}
               {teamToDelete &&
                 teamToDelete.totalMembers > 0 &&
                 ` and affect ${teamToDelete.totalMembers} team member(s)`}
@@ -821,10 +828,11 @@ export default function TeamsPage() {
       }
       const data: Team[] = await response.json();
       setTeams(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch teams.");
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Failed to fetch teams.");
+      setError(message);
       console.error("Failed to fetch teams:", err);
-      toast.error(err.message || "Failed to fetch teams. Please try again.", {
+      toast.error(message, {
         description: "Error fetching teams",
       });
     } finally {
@@ -870,9 +878,10 @@ export default function TeamsPage() {
       toast.success("Team deleted successfully!", {
         description: "The team has been permanently removed.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Failed to delete team. Please try again.");
       console.error("Failed to delete team:", err);
-      toast.error(err.message || "Failed to delete team. Please try again.", {
+      toast.error(message, {
         description: "Error deleting team",
       });
     }
@@ -912,9 +921,10 @@ export default function TeamsPage() {
       toast.success("Team updated successfully!", {
         description: "The team information has been saved.",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = getErrorMessage(err, "Failed to update team. Please try again.");
       console.error("Failed to update team:", err);
-      toast.error(err.message || "Failed to update team. Please try again.", {
+      toast.error(message, {
         description: "Error updating team",
       });
     }
@@ -934,8 +944,6 @@ export default function TeamsPage() {
 
   const totalTeams = teams.length;
   const totalMembers = teams.reduce((sum, team) => sum + team.totalMembers, 0);
-  const averageMembersPerTeam =
-    totalTeams > 0 ? Math.round(totalMembers / totalTeams) : 0;
 
   useEffect(() => {
     if (error) {
@@ -963,7 +971,10 @@ export default function TeamsPage() {
             {/* Stats Cards Skeleton */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {Array.from({ length: 3 }).map((_, index) => (
-                <Card key={`stat-skeleton-${index}`} className="border-0 shadow-lg">
+                <Card
+                  key={`stat-skeleton-${index}`}
+                  className="border-0 shadow-lg"
+                >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <Skeleton className="h-4 w-24" />
                     <Skeleton className="h-10 w-10 rounded-lg" />
@@ -992,7 +1003,10 @@ export default function TeamsPage() {
                 {/* Grid View Skeleton */}
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {Array.from({ length: 6 }).map((_, index) => (
-                    <Card key={`team-skeleton-${index}`} className="border-0 shadow-md">
+                    <Card
+                      key={`team-skeleton-${index}`}
+                      className="border-0 shadow-md"
+                    >
                       <CardHeader className="pb-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center space-x-3">
@@ -1020,7 +1034,10 @@ export default function TeamsPage() {
                           <Skeleton className="h-4 w-32" />
                           <div className="flex -space-x-2">
                             {Array.from({ length: 4 }).map((_, idx) => (
-                              <Skeleton key={idx} className="h-8 w-8 rounded-full" />
+                              <Skeleton
+                                key={idx}
+                                className="h-8 w-8 rounded-full"
+                              />
                             ))}
                           </div>
                         </div>

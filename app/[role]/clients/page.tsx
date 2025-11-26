@@ -77,7 +77,13 @@ export default function ClientsPage() {
 
   const handleViewClientDetails = useCallback(
     (client: Client) => {
-      router.push(`/${roleSegment}/clients/${client.id}`);
+      const detailPath = `/${roleSegment}/clients/${client.id}`;
+      try {
+        (router as any)?.prefetch?.(detailPath);
+      } catch {
+        /* ignore prefetch errors */
+      }
+      router.push(detailPath);
     },
     [router, roleSegment]
   );
