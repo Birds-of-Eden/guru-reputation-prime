@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -9,17 +10,52 @@ import { MapPin, Building, PencilLine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUserSession } from "@/lib/hooks/use-user-session";
 import ClientEditModal from "../client-edit-modal";
-import { Profile } from "./profile";
-import { Bio } from "./bio";
-import { DriveImage } from "./drive-image";
-import { SocialProfile } from "./social-profile";
-import { Tasks } from "./task";
 import { Client } from "@/types/client";
-import { OtherInformation } from "./otherInformation";
-import { ArticleTopics } from "./articleTopics";
 import ExportClientTxtButton from "@/components/ExportClientTxtButton";
-import { TemplateManagement } from "./template-management";
 import { RenewPostingTasksButton } from "./renewbutton";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const Profile = dynamic(
+  () => import("./profile").then((mod) => mod.Profile),
+  {
+    loading: () => <Skeleton className="h-32 w-full" />,
+  }
+);
+
+const OtherInformation = dynamic(
+  () => import("./otherInformation").then((mod) => mod.OtherInformation),
+  {
+    loading: () => <Skeleton className="h-32 w-full" />,
+  }
+);
+
+const Bio = dynamic(() => import("./bio").then((mod) => mod.Bio), {
+  loading: () => <Skeleton className="h-32 w-full" />,
+});
+
+const DriveImage = dynamic(
+  () => import("./drive-image").then((mod) => mod.DriveImage),
+  { loading: () => <Skeleton className="h-32 w-full" /> }
+);
+
+const ArticleTopics = dynamic(
+  () => import("./articleTopics").then((mod) => mod.ArticleTopics),
+  { loading: () => <Skeleton className="h-32 w-full" /> }
+);
+
+const SocialProfile = dynamic(
+  () => import("./social-profile").then((mod) => mod.SocialProfile),
+  { loading: () => <Skeleton className="h-32 w-full" /> }
+);
+
+const TemplateManagement = dynamic(
+  () => import("./template-management").then((mod) => mod.TemplateManagement),
+  { loading: () => <Skeleton className="h-32 w-full" /> }
+);
+
+const Tasks = dynamic(() => import("./task").then((mod) => mod.Tasks), {
+  loading: () => <Skeleton className="h-32 w-full" />,
+});
 
 interface ClientDashboardProps {
   clientData: Client;

@@ -11,6 +11,7 @@ import {
   useRef,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useSWRConfig } from "swr";
 import {
   FileText,
   Eye,
@@ -55,6 +56,9 @@ interface ClientCardProps {
   onToggleFavorite?: (clientId: string) => void;
 }
 
+// Track in-flight client dashboard prefetches to avoid duplicate fetches
+const clientDashboardWarmups = new Map<string, Promise<any>>();
+
 const ClientCardComponent = function ClientCard({
   client,
   clientUserId,
@@ -64,6 +68,7 @@ const ClientCardComponent = function ClientCard({
 }: ClientCardProps) {
   const { user, loading: permsLoading } = useUserSession();
   const router = useRouter();
+  const { mutate: mutateCache } = useSWRConfig();
 
   const [deleted, setDeleted] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -254,10 +259,36 @@ const ClientCardComponent = function ClientCard({
     }
   }, [router, detailUrl]);
 
+  const warmClientDashboard = useCallback(() => {
+    const key = `/api/clients/${client.id}`;
+    if (clientDashboardWarmups.has(key)) return clientDashboardWarmups.get(key);
+
+    const p = fetch(key, { next: { revalidate: 60 } })
+      .then((res) => {
+        if (!res.ok) throw new Error("failed to preload client");
+        return res.json();
+      })
+      .then((data) => {
+        mutateCache(key, data, false);
+        return data;
+      })
+      .catch(() => {
+        clientDashboardWarmups.delete(key);
+      });
+
+    clientDashboardWarmups.set(key, p);
+    return p;
+  }, [client.id, mutateCache]);
+
+  const primeDetails = useCallback(() => {
+    prefetchDetails();
+    warmClientDashboard();
+  }, [prefetchDetails, warmClientDashboard]);
+
   useEffect(() => {
     if (!canViewDetails) return;
-    prefetchDetails();
-  }, [canViewDetails, prefetchDetails]);
+    primeDetails();
+  }, [canViewDetails, primeDetails]);
 
   async function handleDelete() {
     setIsDeleting(true);
@@ -272,14 +303,14 @@ const ClientCardComponent = function ClientCard({
 
   const handleViewDetails = useCallback(
     (event?: { preventDefault?: () => void }) => {
-      prefetchDetails();
+      primeDetails();
       if (onViewDetails) {
         event?.preventDefault?.();
         return onViewDetails();
       }
       router.push(detailUrl);
     },
-    [onViewDetails, router, detailUrl, prefetchDetails]
+    [onViewDetails, router, detailUrl, primeDetails]
   );
 
   const handleViewTasks = () => {
