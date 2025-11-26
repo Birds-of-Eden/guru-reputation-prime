@@ -9,52 +9,56 @@ import { FormEvent, useEffect, useState } from "react";
 import { Loader, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { signIn } from "next-auth/react";
-import { useSession } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export function LoginForm() {
   const { status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
   const [showPass, setShowPass] = useState(false);
+
+  const routeByRole = (role: string) =>
+    role === "admin"
+      ? "/admin"
+      : role === "agent"
+      ? "/agent"
+      : role === "manager"
+      ? "/manager"
+      : role === "qc"
+      ? "/qc"
+      : role === "am"
+      ? "/am"
+      : role === "am_ceo"
+      ? "/am_ceo"
+      : role === "data_entry"
+      ? "/data_entry"
+      : "/client";
+
+  const sendToRole = (role: string) => {
+    setRedirecting(true);
+    router.replace(routeByRole(role.toLowerCase()));
+    router.refresh();
+  };
 
   // If already authenticated (e.g., came back from Google), redirect by role
   useEffect(() => {
-    if (status !== "authenticated") return;
+    if (status !== "authenticated" || redirecting) return;
     (async () => {
       try {
         const me = await fetch("/api/auth/session", { cache: "no-store" });
         const json = await me.json();
-        const role = (json?.user?.role || "").toLowerCase();
-        const target =
-          role === "admin"
-            ? "/admin"
-            : role === "agent"
-            ? "/agent"
-            : role === "manager"
-            ? "/manager"
-            : role === "qc"
-            ? "/qc"
-            : role === "am"
-            ? "/am"
-            : role === "am_ceo"
-            ? "/am_ceo"
-            : role === "data_entry"
-            ? "/data_entry"
-            : "/client";
-
-        // ✅ replace so back চাপলে sign-in এ না ফেরে
-        router.replace(target);
-        router.refresh();
+        sendToRole(json?.user?.role || "");
       } catch {
         /* ignore */
       }
     })();
-  }, [status, router]);
+  }, [status, router, redirecting]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (loading || redirecting) return;
     setLoading(true);
 
     const form = e.currentTarget;
@@ -72,45 +76,23 @@ export function LoginForm() {
 
       if (res?.error) {
         toast.error(res.error || "Invalid credentials");
+        setLoading(false);
         return;
       }
 
       toast.success("Signed in successfully!");
 
-      // ছোট্ট সময় দিন যাতে session hydrate হয়
-      setTimeout(async () => {
-        const me = await fetch("/api/auth/session", { cache: "no-store" });
-        const json = await me.json();
-        const role = (json?.user?.role || "").toLowerCase();
-
-        const target =
-          role === "admin"
-            ? "/admin"
-            : role === "agent"
-            ? "/agent"
-            : role === "manager"
-            ? "/manager"
-            : role === "qc"
-            ? "/qc"
-            : role === "am"
-            ? "/am"
-            : role === "am_ceo"
-            ? "/am_ceo"
-            : role === "data_entry"
-            ? "/data_entry"
-            : "/client";
-
-        // ✅ history replace (no back to sign-in)
-        router.replace(target);
-        router.refresh();
-      }, 150);
+      const me = await fetch("/api/auth/session", { cache: "no-store" });
+      const json = await me.json();
+      sendToRole(json?.user?.role || "");
     } catch (err) {
       console.error("Login error:", err);
       toast.error("Something went wrong. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
+
+  const busy = loading || redirecting;
 
   return (
     <Card className="bg-transparent border-none">
@@ -181,7 +163,7 @@ export function LoginForm() {
                 "shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
               )}
               onClick={() => signIn("google")} // Google OAuth
-              disabled={loading}
+              disabled={busy}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path
@@ -194,7 +176,7 @@ export function LoginForm() {
                 />
                 <path
                   fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93ল2.85-2.22.81-.62z"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93?2.85-2.22.81-.62z"
                 />
                 <path
                   fill="#EA4335"
@@ -216,9 +198,9 @@ export function LoginForm() {
                 "transition-all duration-300 ease-in-out hover:from-pink-500 hover:to-indigo-500",
                 "shadow-lg hover:shadow-pink-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
               )}
-              disabled={loading}
+              disabled={busy}
             >
-              {loading ? (
+              {busy ? (
                 <Loader className="animate-spin w-5 h-5 mx-auto" />
               ) : (
                 "Sign in"
