@@ -2,7 +2,15 @@
 
 "use client";
 
-import { useEffect, useMemo, useState, useCallback, lazy, Suspense, memo } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useCallback,
+  lazy,
+  Suspense,
+  memo,
+} from "react";
 import useSWR from "swr";
 import { useDebounce } from "@/lib/hooks/use-debounce";
 import { Button } from "@/components/ui/button";
@@ -35,11 +43,15 @@ import {
 import { toast } from "sonner";
 import { useUserSession } from "@/lib/hooks/use-user-session";
 // Lazy load heavy components for better performance
-const FilterSection = lazy(() => 
-  import("@/components/qc-review/filter-section").then(m => ({ default: m.FilterSection }))
+const FilterSection = lazy(() =>
+  import("@/components/qc-review/filter-section").then((m) => ({
+    default: m.FilterSection,
+  }))
 );
-const TaskCard = lazy(() => 
-  import("@/components/qc-review/task-card").then(m => ({ default: m.TaskCard }))
+const TaskCard = lazy(() =>
+  import("@/components/qc-review/task-card").then((m) => ({
+    default: m.TaskCard,
+  }))
 );
 
 // Skeleton components for lazy loading
@@ -58,53 +70,82 @@ const TaskCardSkeleton = memo(() => (
   <div className="h-32 bg-slate-200 rounded-xl animate-pulse"></div>
 ));
 
-
 // Virtual list component for large task lists
-const VirtualTaskList = memo(({ 
-  tasks, 
-  approvedMap, 
-  onApprove, 
-  onReject, 
-  qcScoresByTask, 
-  onChangeScores,
-  defaultScores 
-}: {
-  tasks: TaskRow[];
-  approvedMap: Record<string, boolean>;
-  onApprove: (task: TaskRow) => void;
-  onReject: (task: TaskRow) => void;
-  qcScoresByTask: Record<string, QCScores>;
-  onChangeScores: (taskId: string, scores: QCScores) => void;
-  defaultScores: QCScores;
-}) => {
-  const itemData = {
+const VirtualTaskList = memo(
+  ({
     tasks,
     approvedMap,
     onApprove,
-    onReject: (t: TaskRow) => onReject(t),
+    onReject,
     qcScoresByTask,
     onChangeScores,
-    defaultScores
-  };
+    defaultScores,
+  }: {
+    tasks: TaskRow[];
+    approvedMap: Record<string, boolean>;
+    onApprove: (task: TaskRow) => void;
+    onReject: (task: TaskRow) => void;
+    qcScoresByTask: Record<string, QCScores>;
+    onChangeScores: (taskId: string, scores: QCScores) => void;
+    defaultScores: QCScores;
+  }) => {
+    const itemData = {
+      tasks,
+      approvedMap,
+      onApprove,
+      onReject: (t: TaskRow) => onReject(t),
+      qcScoresByTask,
+      onChangeScores,
+      defaultScores,
+    };
 
-  // For large lists, use a scrollable container with max height
-  if (tasks.length > 10) {
+    // For large lists, use a scrollable container with max height
+    if (tasks.length > 10) {
+      return (
+        <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2">
+          {tasks.map((task: TaskRow, index: number) => (
+            <div
+              key={task.id}
+              className="animate-in fade-in-0 slide-in-from-bottom-4"
+              style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
+            >
+              <Suspense fallback={<TaskCardSkeleton />}>
+                <TaskCard
+                  task={task}
+                  approvedMap={itemData.approvedMap}
+                  onApprove={itemData.onApprove}
+                  onReject={itemData.onReject}
+                  scores={
+                    itemData.qcScoresByTask[task.id] ?? itemData.defaultScores
+                  }
+                  onChangeScores={(next) =>
+                    itemData.onChangeScores(task.id, next)
+                  }
+                />
+              </Suspense>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // For smaller lists, render normally for better UX
     return (
-      <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2">
+      <div className="space-y-4">
         {tasks.map((task: TaskRow, index: number) => (
           <div
             key={task.id}
             className="animate-in fade-in-0 slide-in-from-bottom-4"
-            style={{ animationDelay: `${Math.min(index * 50, 500)}ms` }}
+            style={{ animationDelay: `${index * 50}ms` }}
           >
             <Suspense fallback={<TaskCardSkeleton />}>
               <TaskCard
                 task={task}
-                approvedMap={itemData.approvedMap}
-                onApprove={itemData.onApprove}
-                onReject={itemData.onReject}
-                scores={itemData.qcScoresByTask[task.id] ?? itemData.defaultScores}
-                onChangeScores={(next) => itemData.onChangeScores(task.id, next)}
+                approvedMap={approvedMap}
+                onApprove={onApprove}
+                onReject={onReject}
+                scores={qcScoresByTask[task.id] ?? defaultScores}
+                onChangeScores={(next) => onChangeScores(task.id, next)}
               />
             </Suspense>
           </div>
@@ -112,31 +153,7 @@ const VirtualTaskList = memo(({
       </div>
     );
   }
-
-  // For smaller lists, render normally for better UX
-  return (
-    <div className="space-y-4">
-      {tasks.map((task: TaskRow, index: number) => (
-        <div
-          key={task.id}
-          className="animate-in fade-in-0 slide-in-from-bottom-4"
-          style={{ animationDelay: `${index * 50}ms` }}
-        >
-          <Suspense fallback={<TaskCardSkeleton />}>
-            <TaskCard
-              task={task}
-              approvedMap={approvedMap}
-              onApprove={onApprove}
-              onReject={onReject}
-              scores={qcScoresByTask[task.id] ?? defaultScores}
-              onChangeScores={(next) => onChangeScores(task.id, next)}
-            />
-          </Suspense>
-        </div>
-      ))}
-    </div>
-  );
-});
+);
 
 /* =========================
    Types
@@ -155,21 +172,19 @@ type CategoryLite = { id: string; name: string };
 
 type Perf = "Excellent" | "Good" | "Average" | "Lazy";
 
-type QCReviewBlob =
-  | {
-      timerScore: number; // 40..70
-      keyword: number; // 0..5
-      contentQuality: number; // 0..5
-      image: number; // 0..5
-      seo: number; // 0..5
-      grammar: number; // 0..5
-      humanization: number; // 0..5
-      total: number; // 0..100
-      reviewerId?: string | null;
-      reviewedAt?: string;
-      notes?: string | null;
-    }
-  | null;
+type QCReviewBlob = {
+  timerScore: number; // 40..70
+  keyword: number; // 0..5
+  contentQuality: number; // 0..5
+  image: number; // 0..5
+  seo: number; // 0..5
+  grammar: number; // 0..5
+  humanization: number; // 0..5
+  total: number; // 0..100
+  reviewerId?: string | null;
+  reviewedAt?: string;
+  notes?: string | null;
+} | null;
 
 export type QCScores = {
   keyword: number;
@@ -255,18 +270,19 @@ const fetcher = async (url: string) => {
 
 // Custom hook for optimized task fetching
 function useTasks(params: URLSearchParams) {
-  const { data: tasks = [], error, isLoading, mutate } = useSWR(
-    `/api/tasks?${params.toString()}`,
-    fetcher,
-    {
-      refreshInterval: 30000, // Auto refresh every 30s
-      revalidateOnFocus: true,
-      dedupingInterval: 5000, // Dedupe requests within 5s
-      errorRetryCount: 3,
-      errorRetryInterval: 2000,
-    }
-  );
-  
+  const {
+    data: tasks = [],
+    error,
+    isLoading,
+    mutate,
+  } = useSWR(`/api/tasks?${params.toString()}`, fetcher, {
+    refreshInterval: 30000, // Auto refresh every 30s
+    revalidateOnFocus: true,
+    dedupingInterval: 5000, // Dedupe requests within 5s
+    errorRetryCount: 3,
+    errorRetryInterval: 2000,
+  });
+
   return { tasks, loading: isLoading, error, refetch: mutate };
 }
 
@@ -333,7 +349,12 @@ export const QCReview = memo(function QCReview() {
   }, [agentId, clientId, categoryId, startDate, endDate]);
 
   // Use optimized hooks
-  const { tasks, loading, error: tasksError, refetch: refetchTasks } = useTasks(taskParams);
+  const {
+    tasks,
+    loading,
+    error: tasksError,
+    refetch: refetchTasks,
+  } = useTasks(taskParams);
   const { agents } = useAgents();
   const { clients } = useClients();
   const { categories } = useCategories();
@@ -358,8 +379,8 @@ export const QCReview = memo(function QCReview() {
   // Error handling for data fetching
   useEffect(() => {
     if (tasksError) {
-      console.error('Tasks fetch error:', tasksError);
-      toast.error('Failed to load tasks data.');
+      console.error("Tasks fetch error:", tasksError);
+      toast.error("Failed to load tasks data.");
     }
   }, [tasksError]);
 
@@ -367,7 +388,7 @@ export const QCReview = memo(function QCReview() {
   const filtered = useMemo(() => {
     if (!debouncedQ.trim()) return tasks;
     const needle = debouncedQ.toLowerCase();
-    
+
     // Pre-build search strings for better performance
     return tasks.filter((t: TaskRow) => {
       const searchString = [
@@ -380,8 +401,10 @@ export const QCReview = memo(function QCReview() {
         t.category?.name ?? "",
         t.assignment?.template?.name ?? "",
         t.templateSiteAsset?.name ?? "",
-      ].join(" ").toLowerCase();
-      
+      ]
+        .join(" ")
+        .toLowerCase();
+
       return searchString.includes(needle);
     });
   }, [debouncedQ, tasks]);
@@ -487,13 +510,16 @@ export const QCReview = memo(function QCReview() {
     // >>>>>>>>> CHANGE: allow approval even if actualDurationMinutes is missing
     // If we still couldn't compute, fall back to "Average" so approval proceeds.
     const finalRating: Perf =
-      (sysRating as Perf | undefined) !== undefined ? (sysRating as Perf) : "Average";
+      (sysRating as Perf | undefined) !== undefined
+        ? (sysRating as Perf)
+        : "Average";
     // <<<<<<<<<<< END CHANGE
 
     setApproveDialog((p) => ({ ...p, loading: true }));
     try {
-      const scores =
-        qcScoresByTask[approveDialog.task.id] ?? { ...defaultScores };
+      const scores = qcScoresByTask[approveDialog.task.id] ?? {
+        ...defaultScores,
+      };
 
       const total =
         Math.min(
@@ -854,14 +880,14 @@ export const QCReview = memo(function QCReview() {
                   <h3 className="font-semibold text-slate-900">
                     {reassignDialog.task.name}
                   </h3>
-                  <p className="text-sm text-slate-600 flex items-center gap-2">
+                  <div className="text-sm text-slate-600 flex items-center gap-2">
                     <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
                     Current agent:{" "}
                     <span className="font-medium text-slate-900">
                       {reassignDialog.task.assignedTo?.name ||
                         reassignDialog.task.assignedTo?.email}
                     </span>
-                  </p>
+                  </div>
                 </div>
               </div>
               <div className="space-y-2">
