@@ -224,6 +224,16 @@ export default function TaskList({
 
   const mask = (s?: string | null) => (s ? "*********" : "N/A");
 
+  // ✅ helper: reassigned-like task detect (timer start korleo reassigned e thakbe)
+  const isReassignedLike = (task: Task) => {
+    return (
+      task.status === "reassigned" ||
+      (!!task.reassignNotes &&
+        task.status !== "completed" &&
+        task.status !== "qc_approved")
+    );
+  };
+
   // তারিখ ভিত্তিক টাস্ক গ্রুপিং
   const groupTasksByDate = (tasks: Task[]) => {
     const today = new Date();
@@ -249,8 +259,9 @@ export default function TaskList({
         return;
       }
 
-      // ⬅️ NEW: reassigned task gula alada group-e
-      if (task.status === "reassigned") {
+      // ✅ UPDATED: reassigned-like task gula alada group-e
+      // timer start korle status change holeo reassignNotes thakle ekhanei thakbe
+      if (isReassignedLike(task)) {
         groups.reassigned.push(task);
         return;
       }
@@ -935,7 +946,7 @@ export default function TaskList({
                   </div>
                   <div className="text-sm flex items-center gap-2">
                     <span className="font-bold text-gray-800 dark:text-gray-200">
-                      Username:
+                    Username:
                     </span>{" "}
                     <span className="font-mono text-gray-700 dark:text-gray-300 break-all bg-white dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-600">
                       {reveal ? task.username || "N/A" : mask(task.username)}
