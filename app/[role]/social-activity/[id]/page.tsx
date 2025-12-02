@@ -341,7 +341,6 @@ export default function TaskDetailsPage() {
 
   useEffect(() => {
     loadTask();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
   /* ---------------- Add Links modal logic ---------------- */

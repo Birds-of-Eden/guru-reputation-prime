@@ -325,7 +325,6 @@ export function CreateTemplateModal({
       setCurrentStep(0);
     }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, isEditMode, initialData]);
 
   const initializeDefaultAssets = () => {

@@ -65,12 +65,11 @@ export function AmCeoClientOverviewHeader({
     if (isAM && currentUserIdStr && amFilter !== currentUserIdStr) {
       setAmFilter(currentUserIdStr);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAM, currentUserIdStr]);
 
   // 🔎 Debug helpers (চাইলে রাখুন, সমস্যা বোঝা সহজ হবে)
   useEffect(() => {
-    // eslint-disable-next-line no-console
+     
     console.log(
       "[AM FILTER/HEADER] isAM:",
       isAM,

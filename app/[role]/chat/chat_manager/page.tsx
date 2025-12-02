@@ -68,7 +68,6 @@ export default function ChatPage() {
         if (!selectedTeamId && list.length) setSelectedTeamId(list[0].id);
       })
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const {

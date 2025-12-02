@@ -65,7 +65,6 @@ export function ClientOverviewHeader({
     if (isAM && currentUserId && amFilter !== currentUserId) {
       setAmFilter(currentUserId)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAM, currentUserId])
 
   return (

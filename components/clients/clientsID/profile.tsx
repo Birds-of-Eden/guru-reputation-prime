@@ -418,7 +418,6 @@ export function Profile({ clientData, currentUserRole }: ProfileProps) {
       fetchPackages();
       fetchAMs();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isAgent]);
 
   const toDateInput = (v?: string | null) => {

@@ -2,7 +2,8 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import Image from "next/image";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -197,14 +198,14 @@ export function ImageGallery({
         blob.type && blob.type.startsWith("image/") ? blob.type : "image/png";
 
       // Try native binary clipboard write
-      // @ts-ignore
+      // @ts-expect-error
       if (
         navigator.clipboard &&
         "write" in navigator.clipboard &&
         typeof ClipboardItem !== "undefined"
       ) {
         try {
-          // @ts-ignore
+          // @ts-expect-error
           await navigator.clipboard.write([
             new ClipboardItem({ [mime]: blob }),
           ]);
@@ -215,7 +216,7 @@ export function ImageGallery({
         } catch {
           // Fallback: PNG convert then copy
           const pngBlob = await toPngBlob(blob);
-          // @ts-ignore
+          // @ts-expect-error
           await navigator.clipboard.write([
             new ClipboardItem({ "image/png": pngBlob }),
           ]);
@@ -249,13 +250,13 @@ export function ImageGallery({
   async function toPngBlob(src: Blob): Promise<Blob> {
     try {
       const bmp = await createImageBitmap(src);
-      // @ts-ignore
+      // @ts-expect-error
       if (typeof OffscreenCanvas !== "undefined") {
-        // @ts-ignore
+        // @ts-expect-error
         const canvas = new OffscreenCanvas(bmp.width, bmp.height);
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(bmp, 0, 0);
-        // @ts-ignore
+        // @ts-expect-error
         return await canvas.convertToBlob({ type: "image/png" });
       }
       const canvas = document.createElement("canvas");
@@ -310,11 +311,11 @@ export function ImageGallery({
         return (
           <Card key={img.id} className="overflow-hidden group">
             <div className="relative aspect-square">
-              {/* 💡 FIX: Using standard <img> tag instead of Next.js <Image> */}
-              <img
+              {/* 💡 FIX: Using Next.js <Image> component for optimization */}
+              <Image
                 src={img.viewUrl}
                 alt={img.name}
-                // Tailwind classes for fill/object-cover replacement
+                fill
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src = img.thumbnail;

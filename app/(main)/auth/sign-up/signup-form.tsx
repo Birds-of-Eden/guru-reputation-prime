@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -97,9 +98,9 @@ export function SignupForm() {
             </div>
             <div className="mt-4 text-center text-sm">
               Already have an account?&nbsp;
-              <a href="/auth/sign-in" className="underline underline-offset-4">
+              <Link href="/auth/sign-in" className="underline underline-offset-4">
                 Sign In
-              </a>
+              </Link>
             </div>
           </form>
         </CardContent>

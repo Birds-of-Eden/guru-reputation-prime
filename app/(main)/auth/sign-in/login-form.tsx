@@ -1,6 +1,7 @@
 // app/(main)/auth/sign-in/login-form.tsx
 "use client";
 
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -99,9 +100,11 @@ export function LoginForm() {
       <CardHeader>
         <div className="flex items-center justify-center mb-3">
           <div className="p-[3px] bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 rounded-lg">
-            <img
+            <Image
               src="/birds_of_eden.jpeg"
               alt="Boed-logo"
+              width={224}
+              height={224}
               className="w-56 h-56 object-cover rounded-lg shadow-lg hover:scale-105 transition-transform duration-500 ease-out"
             />
           </div>

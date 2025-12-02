@@ -83,7 +83,6 @@ export function GeneralInfo({ formData, updateFormData, onNext }: StepProps) {
     if (isAM && currentUserId && formData.amId !== currentUserId) {
       updateFormData({ amId: currentUserId });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAM, currentUserId]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

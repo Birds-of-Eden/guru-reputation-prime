@@ -12,7 +12,7 @@ if (!fs.existsSync(file)) {
   process.exit(1);
 }
 
-let src = fs.readFileSync(file, "utf8");
+const src = fs.readFileSync(file, "utf8");
 
 // Safe regex (no 's' flag): capture each model block
 const modelBlockRegex = /model\s+([A-Za-z0-9_]+)\s*\{[\s\S]*?\}/gm;

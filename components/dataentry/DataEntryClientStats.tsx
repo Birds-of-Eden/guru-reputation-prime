@@ -128,7 +128,6 @@ export default function DataEntryClientStats({ clients }: DataEntryClientStatsPr
   // Auto refresh when filters change
   useEffect(() => {
     refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId]);
 
   return (

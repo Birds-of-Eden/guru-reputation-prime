@@ -120,7 +120,6 @@ export default function AgentFormPage({
     };
 
     fetchTeams();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const validateForm = () => {

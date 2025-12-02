@@ -13,7 +13,7 @@ import {
 function isSecure(req: NextRequest) {
   const proto =
     req.headers.get("x-forwarded-proto") ??
-    // @ts-ignore - nextUrl.protocol exists in Next runtime
+    // @ts-expect-error - nextUrl.protocol exists in Next runtime
     req.nextUrl?.protocol?.replace(":", "") ??
     "http";
   return proto === "https";

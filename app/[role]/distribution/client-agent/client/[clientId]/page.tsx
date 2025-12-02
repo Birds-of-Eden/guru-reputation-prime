@@ -513,7 +513,6 @@ export default function CreatePostingTasksPage() {
   // Fetch preview when client or template changes
   useEffect(() => {
     if (clientId) fetchPreview(); // Use clientId instead of selectedClientId
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, templateId]);
 
   const filteredCreatedTasks = useMemo(() => {

@@ -137,14 +137,14 @@ export function DriveImageGallery({
         blob.type && blob.type.startsWith("image/") ? blob.type : "image/png";
 
       // Try native binary clipboard write
-      // @ts-ignore
+      // @ts-expect-error
       if (
         navigator.clipboard &&
         "write" in navigator.clipboard &&
         typeof ClipboardItem !== "undefined"
       ) {
         try {
-          // @ts-ignore
+          // @ts-expect-error
           await navigator.clipboard.write([
             new ClipboardItem({ [mime]: blob }),
           ]);
@@ -155,7 +155,7 @@ export function DriveImageGallery({
         } catch {
           // Fallback: PNG convert then copy
           const pngBlob = await toPngBlob(blob);
-          // @ts-ignore
+          // @ts-expect-error
           await navigator.clipboard.write([
             new ClipboardItem({ "image/png": pngBlob }),
           ]);
@@ -195,13 +195,13 @@ export function DriveImageGallery({
   async function toPngBlob(src: Blob): Promise<Blob> {
     try {
       const bmp = await createImageBitmap(src);
-      // @ts-ignore
+      // @ts-expect-error
       if (typeof OffscreenCanvas !== "undefined") {
-        // @ts-ignore
+        // @ts-expect-error
         const canvas = new OffscreenCanvas(bmp.width, bmp.height);
         const ctx = canvas.getContext("2d")!;
         ctx.drawImage(bmp, 0, 0);
-        // @ts-ignore
+        // @ts-expect-error
         return await canvas.convertToBlob({ type: "image/png" });
       }
       const canvas = document.createElement("canvas");

@@ -65,10 +65,12 @@ const FilterSkeleton = memo(() => (
     <div className="h-10 bg-slate-200 rounded animate-pulse"></div>
   </div>
 ));
+FilterSkeleton.displayName = "FilterSkeleton";
 
 const TaskCardSkeleton = memo(() => (
   <div className="h-32 bg-slate-200 rounded-xl animate-pulse"></div>
 ));
+TaskCardSkeleton.displayName = "TaskCardSkeleton";
 
 // Virtual list component for large task lists
 const VirtualTaskList = memo(
@@ -154,6 +156,7 @@ const VirtualTaskList = memo(
     );
   }
 );
+VirtualTaskList.displayName = "VirtualTaskList";
 
 /* =========================
    Types

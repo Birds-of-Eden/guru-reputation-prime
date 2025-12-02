@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import Image from "next/image";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -171,7 +172,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <img
+                <Image
                   src="/placeholder.svg?height=32&width=32"
                   alt="Avatar"
                   className="rounded-full border"

@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
     const assignedToId = searchParams.get("assignedToId");
 
-    let where: any = {};
+    const where: any = {};
 
     // ----- Date Range -----
     if (startDate && endDate) {

@@ -154,7 +154,7 @@ export async function POST(request: Request) {
       (typeof headerActor === "string" && headerActor) ||
       null;
 
-    let { name, description, totalMonths, type } = body as {
+    const { name, description, totalMonths, type } = body as {
       name?: string;
       description?: string | null;
       totalMonths?: number | string | null;

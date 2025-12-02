@@ -369,7 +369,7 @@ export default function RolePermissionPage() {
     });
 
     return categorized;
-  }, [permissions]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [permissions]);
 
   // ---------------- Loaders ----------------
   const loadRoles = async () => {
@@ -403,7 +403,7 @@ export default function RolePermissionPage() {
   useEffect(() => {
     loadRoles();
     loadPermissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 
   const loadRolePermissions = async (roleId: string) => {

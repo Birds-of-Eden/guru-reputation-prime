@@ -67,7 +67,6 @@ export default function ClientsPage() {
     ) {
       setAmFilter(currentUserId);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionLoading, isAM, currentUserId]);
 
 
