@@ -388,16 +388,18 @@ export default function CreatedTasksPage() {
 
   const allCycleLabels = cycles.map((c) => c.label);
 
-  useEffect(() => {
-    setExpandedCycles((prev) => {
-      if (Object.keys(prev).length) return prev;
-      const init: Record<string, boolean> = {};
-      cycles.forEach((c, idx) => {
-        init[c.key] = idx === 0;
-      });
-      return init;
+useEffect(() => {
+  setExpandedCycles((prev) => {
+    if (Object.keys(prev).length) return prev;
+
+    const init: Record<string, boolean> = {};
+    cycles.forEach((c) => {
+      init[c.key] = false; // ✅ all collapsed initially
     });
-  }, [cycles]);
+
+    return init;
+  });
+}, [cycles]);
 
   const toggleCycle = (key: string) =>
     setExpandedCycles((s) => ({ ...s, [key]: !s[key] }));
