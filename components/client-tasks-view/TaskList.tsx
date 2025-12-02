@@ -365,7 +365,7 @@ export default function TaskList({
         const isThisTaskDisabled = locked || isTaskDisabled(task.id);
 
         const reveal = canReveal(task, timerState);
-
+console.log("TASK DEBUG:", task.id, task.status, task.reassignNotes, task);
         return (
           <div
             key={task.id}
@@ -513,7 +513,9 @@ export default function TaskList({
                         {task.category?.name || "N/A"}
                       </Badge>
                     </div>
-                    {task.status === "reassigned" && (
+
+                    {/* ✅ UPDATED: reassigned-like হলে note দেখাবে */}
+                    {isReassignedLike(task) && (
                       <div className="flex items-center gap-2 mb-4 text-xs font-medium text-gray-600 dark:text-gray-400">
                         <p>Reassign Note:</p>
                         {task.reassignNotes && (
@@ -544,6 +546,7 @@ export default function TaskList({
                     )}
                   </div>
                 </div>
+
                 <div className="flex-1 min-w-0 w-full lg:w-auto">
                   <div className="space-y-3 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800/50 dark:to-slate-800/50 rounded-xl p-4 border-2 border-gray-200 dark:border-gray-700">
                     <div className="text-sm flex items-center gap-2">
@@ -578,6 +581,7 @@ export default function TaskList({
                         </Button>
                       )}
                     </div>
+
                     <div className="text-sm flex items-center gap-2">
                       <span className="font-bold text-gray-800 dark:text-gray-200">
                         Username:
@@ -617,6 +621,7 @@ export default function TaskList({
                         </Button>
                       )}
                     </div>
+
                     <div className="text-sm flex items-center gap-2">
                       <span className="font-bold text-gray-800 dark:text-gray-200">
                         Password:
@@ -758,6 +763,7 @@ export default function TaskList({
                     )}
                   </div>
                 </div>
+
                 <div className="w-full lg:w-auto lg:min-w-[120px]">
                   <TaskTimer
                     task={task}
@@ -794,7 +800,7 @@ export default function TaskList({
         const isThisTaskDisabled = locked || isTaskDisabled(task.id);
         const performanceRating = task.performanceRating;
         const reveal = task.status !== "pending" || isTimerActive;
-
+console.log("TASK DEBUG:", task.id, task.status, task.reassignNotes, task);
         return (
           <div
             key={task.id}
@@ -820,10 +826,13 @@ export default function TaskList({
                       )}
                       <PerformanceBadge rating={performanceRating as any} />
                     </div>
+
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-1">
                         {getStatusBadge(task.status)}
-                        {task.status === "reassigned" && task.reassignNotes && (
+
+                        {/* ✅ UPDATED: reassigned-like হলে note btn দেখাবে */}
+                        {isReassignedLike(task) && task.reassignNotes && (
                           <Button
                             variant="ghost"
                             size="icon"
@@ -837,6 +846,7 @@ export default function TaskList({
                           </Button>
                         )}
                       </div>
+
                       {getPriorityBadge(task.priority)}
                       <Badge
                         variant="outline"
@@ -944,9 +954,10 @@ export default function TaskList({
                       </Button>
                     )}
                   </div>
+
                   <div className="text-sm flex items-center gap-2">
                     <span className="font-bold text-gray-800 dark:text-gray-200">
-                    Username:
+                      Username:
                     </span>{" "}
                     <span className="font-mono text-gray-700 dark:text-gray-300 break-all bg-white dark:bg-gray-800 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-600">
                       {reveal ? task.username || "N/A" : mask(task.username)}
@@ -972,6 +983,7 @@ export default function TaskList({
                       </Button>
                     )}
                   </div>
+
                   <div className="text-sm flex items-center gap-2">
                     <span className="font-bold text-gray-800 dark:text-gray-200">
                       Password:
@@ -1037,6 +1049,7 @@ export default function TaskList({
                   </div>
                 </div>
               </div>
+
               <div className="mt-6 -mx-6 -mb-8 px-8 py-5 bg-gradient-to-r from-violet-50/70 to-purple-50/70 dark:from-violet-900/20 dark:to-purple-900/20 border-t-2 border-violet-200/70 dark:border-violet-700/70 backdrop-blur-sm">
                 <div className="flex justify-between mt-3">
                   <TaskTimer
@@ -1111,15 +1124,8 @@ export default function TaskList({
                                   />
                                   <ScorePill label="SEO" value={r.seo} />
                                   <ScorePill label="Image" value={r.image} />
-                                  <ScorePill
-                                    label="Grammar"
-                                    value={r.grammar}
-                                  />
-                                  <ScorePill
-                                    label="Keyword"
-                                    value={r.keyword}
-                                  />
-
+                                  <ScorePill label="Grammar" value={r.grammar} />
+                                  <ScorePill label="Keyword" value={r.keyword} />
                                   <ScorePill
                                     label="Humanization"
                                     value={r.humanization}
@@ -1217,6 +1223,7 @@ export default function TaskList({
             </div>
           </CardHeader>
         </div>
+
         {/* সার্চ এবং ফিল্টার */}
         <div className="flex flex-col xl:flex-row mt-5 gap-6 mb-8 items-start px-8">
           <div className="relative flex-1 w-full">
@@ -1258,6 +1265,7 @@ export default function TaskList({
             </Select>
           </div>
         </div>
+
         <CardContent className="p-8 max-w-full overflow-x-hidden">
           {/* তারিখ ভিত্তিক ট্যাব */}
           <Tabs
@@ -1281,6 +1289,7 @@ export default function TaskList({
                   </Badge>
                 )}
               </TabsTrigger>
+
               <TabsTrigger
                 value="tomorrow"
                 className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
@@ -1296,6 +1305,7 @@ export default function TaskList({
                   </Badge>
                 )}
               </TabsTrigger>
+
               <TabsTrigger
                 value="upcoming"
                 className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
@@ -1312,7 +1322,6 @@ export default function TaskList({
                 )}
               </TabsTrigger>
 
-              {/* Reassigned tab - Completed er ager position e */}
               <TabsTrigger
                 value="reassigned"
                 className="flex items-center gap-2 rounded-xl text-base font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-600 data-[state=active]:via-purple-600 data-[state=active]:to-pink-600 data-[state=active]:text-white transition-all duration-300"
@@ -1346,7 +1355,6 @@ export default function TaskList({
               </TabsTrigger>
             </TabsList>
 
-            {/* ট্যাব কন্টেন্ট */}
             <TabsContent value="today" className="mt-6">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -1442,7 +1450,6 @@ export default function TaskList({
               )}
             </TabsContent>
 
-            {/* Reassigned tab content */}
             <TabsContent value="reassigned" className="mt-6">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">

@@ -89,6 +89,11 @@ export interface Task {
   completedAt: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // ✅ NEW: reassignment notes from agents endpoint
+  reassignNotes?: string | null;
+  notes?: string | null; // fallback if your DB uses notes field
+
   assignment: {
     id: string;
     client: { id: string; name: string; avatar: string | null } | null;
@@ -344,7 +349,6 @@ export function ClientTasksView({
           savedAt?: number;
           agentId?: string;
         };
-        // normalize to a TimerState; force not running
         setPausedTimer({
           taskId: p.taskId,
           remainingSeconds: Math.max(0, p.remainingSeconds ?? 0),
@@ -362,24 +366,30 @@ export function ClientTasksView({
     }
   }, []);
 
+  // ✅ UPDATED: fetch only from agents endpoint to get reassignNotes
   const fetchClientTasks = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const agentResponse = await fetch(`/api/tasks/clients/agents/${agentId}`);
-      if (!agentResponse.ok)
-        throw new Error(`HTTP error! status: ${agentResponse.status}`);
-      await agentResponse.json(); // (not used directly here)
-
-      const response = await fetch(`/api/tasks/client/${clientId}`);
-      if (!response.ok)
+      const response = await fetch(`/api/tasks/agents/${agentId}`);
+      if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
-      const data: Task[] = await response.json();
+      }
 
-      const agentTasks = data.filter((task) => task.assignedTo?.id === agentId);
+      const json = await response.json();
+      const agentAllTasks: Task[] = json.tasks ?? [];
+
+      // ✅ Filter only tasks for this client
+      const agentTasksForClient = agentAllTasks.filter((task) => {
+        const cid =
+          task.assignment?.client?.id ??
+          (task as any).clientId ??
+          (task as any)?.assignment?.clientId;
+        return cid === clientId;
+      });
 
       // Filter out excluded categories
-      const visibleTasks = agentTasks.filter(
+      const visibleTasks = agentTasksForClient.filter(
         (t) => !EXCLUDED_CATEGORIES.includes(t.category?.name ?? "")
       );
 
@@ -391,7 +401,7 @@ export function ClientTasksView({
         inProgress: visibleTasks.filter((t) => t.status === "in_progress")
           .length,
         completed: visibleTasks.filter((t) => t.status === "completed").length,
-        overdue: visibleTasks.filter((t) => t.status === "overdue").length, // status-based only
+        overdue: visibleTasks.filter((t) => t.status === "overdue").length,
         cancelled: visibleTasks.filter((t) => t.status === "cancelled").length,
         reassigned: visibleTasks.filter((t) => t.status === "reassigned")
           .length,
@@ -458,7 +468,7 @@ export function ClientTasksView({
     }
   }, [isClientModalOpen, fetchClientData]);
 
-  // ✅ PATCH merge-guard: server partial/null রেসপন্সে URL/relations যাতে না হারায়
+  // ✅ PATCH merge-guard
   const handleUpdateTask = useCallback(
     async (taskId: string, updates: any) => {
       try {
@@ -490,6 +500,8 @@ export function ClientTasksView({
               merged.completionLink = t.completionLink;
             if (updatedTask.email == null) merged.email = t.email;
             if (updatedTask.username == null) merged.username = t.username;
+            if (updatedTask.reassignNotes == null)
+              merged.reassignNotes = t.reassignNotes; // ✅ keep old note if patch doesn't return it
 
             return merged as Task;
           })
@@ -506,7 +518,6 @@ export function ClientTasksView({
   const saveTimerToStorage = useCallback(
     (timer: TimerState | null) => {
       try {
-        // CLEAR running + unlock; keep paused as-is (so it can be resumed later)
         if (timer === null) {
           localStorage.removeItem(RUN_KEY);
 
@@ -519,7 +530,6 @@ export function ClientTasksView({
           localStorage.setItem(LOCK_KEY, JSON.stringify(unlock));
           setGlobalTimerLock(unlock);
 
-          // Legacy back-compat keys
           localStorage.removeItem("taskTimer");
           localStorage.removeItem("globalTimerLock");
           return;
@@ -528,11 +538,9 @@ export function ClientTasksView({
         const now = Date.now();
 
         if (timer.isRunning) {
-          // RUNNING → persist as running + lock navigation
           const runningData: StoredTimer = { ...timer, savedAt: now, agentId };
           localStorage.setItem(RUN_KEY, JSON.stringify(runningData));
 
-          // If same task was paused earlier, clear paused record
           try {
             const pausedRaw = localStorage.getItem(PAUSE_KEY);
             if (pausedRaw) {
@@ -552,17 +560,14 @@ export function ClientTasksView({
           localStorage.setItem(LOCK_KEY, JSON.stringify(lockState));
           setGlobalTimerLock(lockState);
 
-          // Legacy keys (keep old loaders working)
           localStorage.setItem("taskTimer", JSON.stringify(runningData));
           localStorage.setItem("globalTimerLock", JSON.stringify(lockState));
           return;
         }
 
-        // PAUSED → single source of truth; overwrite ensures only ONE paused
         const pausedData: StoredTimer = { ...timer, savedAt: now, agentId };
         localStorage.setItem(PAUSE_KEY, JSON.stringify(pausedData));
 
-        // Clear running + unlock
         localStorage.removeItem(RUN_KEY);
         const unlock: GlobalTimerLock = {
           isLocked: false,
@@ -573,7 +578,6 @@ export function ClientTasksView({
         localStorage.setItem(LOCK_KEY, JSON.stringify(unlock));
         setGlobalTimerLock(unlock);
 
-        // Legacy keys (back-compat)
         localStorage.setItem("taskTimer", JSON.stringify(pausedData));
         localStorage.setItem("globalTimerLock", JSON.stringify(unlock));
       } catch (e) {
@@ -585,7 +589,6 @@ export function ClientTasksView({
 
   const loadTimerFromStorage = useCallback(() => {
     try {
-      // Prefer the new running key; fall back to legacy "taskTimer"
       const raw =
         localStorage.getItem(RUN_KEY) ?? localStorage.getItem("taskTimer");
       const lockRaw =
@@ -639,12 +642,11 @@ export function ClientTasksView({
   useEffect(() => {
     if (tasks.length > 0) {
       loadTimerFromStorage();
-      loadPausedFromStorage(); // 👈 add this
+      loadPausedFromStorage();
     }
   }, [tasks, loadTimerFromStorage, loadPausedFromStorage]);
 
   const isTaskDisabled = useCallback((_taskId: string) => false, []);
-
   const isAnyTimerRunning = globalTimerLock.isLocked;
   const isBackButtonDisabled = isAnyTimerRunning;
 
@@ -653,7 +655,6 @@ export function ClientTasksView({
       const task = tasks.find((t) => t.id === taskId);
       if (!task?.idealDurationMinutes) return;
 
-      // ❗ Block starting a different task while one is running
       if (globalTimerLock.isLocked && timerState?.taskId !== taskId) {
         toast.error("Please Pause the current running task!!!");
         return;
@@ -664,7 +665,6 @@ export function ClientTasksView({
 
         const totalSeconds = (task.idealDurationMinutes ?? 0) * 60;
 
-        // Resume from PAUSE_KEY if this task was paused
         let remainingSeconds: number | undefined;
         try {
           const pausedRaw = localStorage.getItem(PAUSE_KEY);
@@ -672,15 +672,13 @@ export function ClientTasksView({
             const paused: StoredTimer = JSON.parse(pausedRaw);
             if (paused.taskId === taskId) {
               remainingSeconds = Math.max(0, paused.remainingSeconds);
-              // clear paused snapshot once we resume
               localStorage.removeItem(PAUSE_KEY);
-              setPausedTimer(null); // 👈 NEW: clear UI paused state for this task
+              setPausedTimer(null);
             }
           }
         } catch {}
 
         if (remainingSeconds == null) {
-          // stick to current in-memory remaining if same task, else full duration
           remainingSeconds =
             timerState?.taskId === taskId
               ? timerState.remainingSeconds
@@ -716,7 +714,7 @@ export function ClientTasksView({
       saveTimerToStorage,
       handleUpdateTask,
       agentId,
-      setPausedTimer, // 👈 include if you have eslint exhaustive-deps on
+      setPausedTimer,
     ]
   );
 
@@ -724,7 +722,6 @@ export function ClientTasksView({
     (taskId: string) => {
       if (!timerState || timerState.taskId !== taskId) return;
 
-      // ❗ Only ONE paused task allowed at a time
       try {
         const existing = localStorage.getItem(PAUSE_KEY);
         if (existing) {
@@ -746,8 +743,8 @@ export function ClientTasksView({
         };
 
         setTimerState(updatedTimer);
-        setPausedTimer(updatedTimer); // 👈 add this
-        saveTimerToStorage(updatedTimer); // writes paused snapshot to storage
+        setPausedTimer(updatedTimer);
+        saveTimerToStorage(updatedTimer);
 
         const task = tasks.find((t) => t.id === taskId);
         toast.info(
@@ -766,7 +763,6 @@ export function ClientTasksView({
 
         const totalSeconds = task.idealDurationMinutes * 60;
 
-        // Clear any paused snapshot for this task
         try {
           const pausedRaw = localStorage.getItem(PAUSE_KEY);
           if (pausedRaw) {
@@ -786,11 +782,10 @@ export function ClientTasksView({
         };
 
         setTimerState(updatedTimer);
-        // not running → we want everything unlocked and no running snapshot
         saveTimerToStorage(null);
 
         if (pausedTimer?.taskId === taskId) {
-          setPausedTimer(null); // 👈 add this
+          setPausedTimer(null);
           try {
             localStorage.removeItem("pausedTaskTimer");
           } catch {}
@@ -799,7 +794,7 @@ export function ClientTasksView({
         toast.info(`Timer reset for "${task?.name}".`);
       }
     },
-    [timerState, tasks, saveTimerToStorage]
+    [timerState, tasks, saveTimerToStorage, pausedTimer]
   );
 
   const formatDuration = (minutes: number): string => {
@@ -809,23 +804,18 @@ export function ClientTasksView({
     return remaining > 0 ? `${hours}h ${remaining}m` : `${hours}h`;
   };
 
-  // ClientTasksView এর ভিতরে (component scope)
   const stopTimerNow = useCallback(
     (taskId: string) => {
       if (timerState?.taskId !== taskId) return;
 
-      // লোকাল ভ্যার এ রাখলাম যাতে পরে প্রয়োজনে রোলব্যাক করা যায়
       const snapshot = timerState;
-
-      // সাথে সাথেই UI/interval থামান + স্টোরেজ আনলক করুন
       setTimerState(null);
       saveTimerToStorage(null);
-      // paused snapshot থাকলে মুছে দিন
       try {
         localStorage.removeItem("pausedTaskTimer");
       } catch {}
 
-      return snapshot; // rollback এর কাজে লাগবে
+      return snapshot;
     },
     [timerState, saveTimerToStorage]
   );
@@ -833,9 +823,9 @@ export function ClientTasksView({
   const handleTaskCompletion = useCallback(async () => {
     if (!taskToComplete) return;
 
-    // ➊ আগে থেকে duration হিসাব করে রাখুন (কারণ এখনই timer বন্ধ করবো)
     let actualDurationMinutes = taskToComplete.actualDurationMinutes;
-    let performanceRating: "Excellent" | "Good" | "Average" | "Poor" | "Lazy" = "Average";
+    let performanceRating: "Excellent" | "Good" | "Average" | "Poor" | "Lazy" =
+      "Average";
 
     if (
       timerState?.taskId === taskToComplete.id &&
@@ -846,16 +836,15 @@ export function ClientTasksView({
       const mins = Math.ceil(totalTimeUsedSeconds / 60);
       actualDurationMinutes = Math.max(1, mins || 0);
 
-      // Calculate performance rating based on time ratio
-      const ratio = actualDurationMinutes / taskToComplete.idealDurationMinutes;
-      if (ratio <= 1.2) performanceRating = "Excellent"; // Within 20% of ideal
-      else if (ratio <= 1.5) performanceRating = "Good"; // Within 50% of ideal
-      else if (ratio <= 2.0) performanceRating = "Average"; // Within 100% of ideal
-      else if (ratio <= 3.0) performanceRating = "Poor"; // 100-200% over ideal
-      else performanceRating = "Lazy"; // More than 200% over ideal
+      const ratio =
+        actualDurationMinutes / taskToComplete.idealDurationMinutes;
+      if (ratio <= 1.2) performanceRating = "Excellent";
+      else if (ratio <= 1.5) performanceRating = "Good";
+      else if (ratio <= 2.0) performanceRating = "Average";
+      else if (ratio <= 3.0) performanceRating = "Poor";
+      else performanceRating = "Lazy";
     }
 
-    // ➋ সাথে সাথে টাইমার থামান (optimistic)
     const rollback = stopTimerNow(taskToComplete.id);
 
     try {
@@ -863,8 +852,7 @@ export function ClientTasksView({
         status: "completed",
         completedAt: new Date().toISOString(),
       };
-      if (completionLink?.trim())
-        updates.completionLink = completionLink.trim();
+      if (completionLink?.trim()) updates.completionLink = completionLink.trim();
       if (username?.trim()) updates.username = username.trim();
       if (email?.trim()) updates.email = email.trim();
       if (password?.trim()) updates.password = password;
@@ -879,7 +867,6 @@ export function ClientTasksView({
         prev.map((t) => (t.id === taskToComplete.id ? { ...t, ...updates } : t))
       );
 
-      // ✅ UI cleanups
       setIsCompletionConfirmOpen(false);
       setTaskToComplete(null);
       setCompletionLink("");
@@ -887,12 +874,10 @@ export function ClientTasksView({
       setEmail("");
       setPassword("");
 
-      // টোস্ট (আগেরটার মত)
       if (
         timerState?.taskId === taskToComplete.id &&
         taskToComplete.idealDurationMinutes
       ) {
-        const ideal = taskToComplete.idealDurationMinutes;
         if ((timerState?.remainingSeconds ?? 0) <= 0) {
           toast.success(
             `Task "${taskToComplete.name}" completed with overtime!`
@@ -906,10 +891,8 @@ export function ClientTasksView({
         toast.success(`Task "${taskToComplete.name}" marked as completed!`);
       }
     } catch (e) {
-      // ❗ ফেল করলে আগের টাইমার ফিরিয়ে দিন
       if (rollback) {
         setTimerState(rollback);
-        // running হলে আবার লক/স্টোরেজ সেট করুন
         if (rollback.isRunning) saveTimerToStorage(rollback);
       }
       console.error("Failed to complete task:", e);
@@ -980,8 +963,8 @@ export function ClientTasksView({
                 if (actualDurationMinutes > 0) {
                   updates.actualDurationMinutes = actualDurationMinutes;
 
-                  // Calculate performance rating based on time ratio
-                  const ratio = actualDurationMinutes / task.idealDurationMinutes;
+                  const ratio =
+                    actualDurationMinutes / task.idealDurationMinutes;
                   if (ratio <= 1.2) updates.performanceRating = "Excellent";
                   else if (ratio <= 1.5) updates.performanceRating = "Good";
                   else if (ratio <= 2.0) updates.performanceRating = "Average";
@@ -1063,7 +1046,6 @@ export function ClientTasksView({
       });
   }, [deferredSearch, priorityFilter, statusFilter, tasks]);
 
-  // ✅ Overdue count = strictly status-based
   const overdueCount = tasks.filter((task) => task.status === "overdue").length;
 
   useEffect(() => {
@@ -1174,7 +1156,6 @@ export function ClientTasksView({
 
   return (
     <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-100 dark:from-gray-900 dark:via-blue-900/20 dark:to-indigo-900/20 p-4 lg:p-8">
-      {/* Header */}
       <div className="space-y-8 w-full max-w-[100vw] overflow-x-hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -1211,7 +1192,6 @@ export function ClientTasksView({
           </Button>
         </div>
 
-        {/* Stats Cards — 3 per row; QC Approved after Overdue */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
           <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white">
             <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
@@ -1224,9 +1204,7 @@ export function ClientTasksView({
               </div>
             </CardHeader>
             <CardContent className="relative">
-              <div className="text-3xl font-bold text-white">
-                {tasks.length}
-              </div>
+              <div className="text-3xl font-bold text-white">{tasks.length}</div>
               <p className="text-xs text-blue-100 mt-1">All assigned tasks</p>
             </CardContent>
           </Card>
@@ -1245,7 +1223,6 @@ export function ClientTasksView({
               <div className="text-3xl font-bold text-white">
                 {stats.completed}
               </div>
-              <p className="text-xs text-emerald-100 mt-1"></p>
             </CardContent>
           </Card>
 
@@ -1340,7 +1317,6 @@ export function ClientTasksView({
           </Dialog>
         </div>
 
-        {/* Task Management Section */}
         <div className="max-w-full overflow-x-hidden">
           <TaskList
             agentId={agentId}
@@ -1375,7 +1351,6 @@ export function ClientTasksView({
           />
         </div>
 
-        {/* Dialogs */}
         <TaskDialogs
           isStatusModalOpen={isStatusModalOpen}
           setIsStatusModalOpen={setIsStatusModalOpen}

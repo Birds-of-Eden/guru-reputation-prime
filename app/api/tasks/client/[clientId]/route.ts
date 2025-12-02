@@ -22,6 +22,7 @@ export async function GET(
         createdAt: true,
         updatedAt: true,
         notes: true,
+        reassignNotes: true,
         idealDurationMinutes: true,
         qcTotalScore: true,
         qcReview: true,

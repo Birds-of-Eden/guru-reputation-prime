@@ -3,7 +3,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState , useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -198,14 +198,14 @@ export function ImageGallery({
         blob.type && blob.type.startsWith("image/") ? blob.type : "image/png";
 
       // Try native binary clipboard write
-      // @ts-expect-error
+      
       if (
         navigator.clipboard &&
         "write" in navigator.clipboard &&
         typeof ClipboardItem !== "undefined"
       ) {
         try {
-          // @ts-expect-error
+         
           await navigator.clipboard.write([
             new ClipboardItem({ [mime]: blob }),
           ]);
@@ -216,7 +216,7 @@ export function ImageGallery({
         } catch {
           // Fallback: PNG convert then copy
           const pngBlob = await toPngBlob(blob);
-          // @ts-expect-error
+        
           await navigator.clipboard.write([
             new ClipboardItem({ "image/png": pngBlob }),
           ]);
