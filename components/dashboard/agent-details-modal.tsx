@@ -110,7 +110,7 @@ export function AgentDetailsModal({
   );
 }
 
-function AgentOverviewTab({ selectedAgent }) {
+function AgentOverviewTab({ selectedAgent }: { selectedAgent: any }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <AgentStatisticsCard selectedAgent={selectedAgent} />
@@ -119,7 +119,7 @@ function AgentOverviewTab({ selectedAgent }) {
   );
 }
 
-function AgentStatisticsCard({ selectedAgent }) {
+function AgentStatisticsCard({ selectedAgent }: { selectedAgent: any }) {
   return (
     <div className="rounded-lg border shadow-sm">
       <div className="p-6">
@@ -164,8 +164,8 @@ function AgentStatisticsCard({ selectedAgent }) {
   );
 }
 
-function TaskDistributionCard({ selectedAgent }) {
-  const stats = calculateAgentStats(selectedAgent);
+function TaskDistributionCard({ selectedAgent }: { selectedAgent: any }) {
+  const stats = calculateAgentStats(selectedAgent as any);
 
   return (
     <div className="rounded-lg border shadow-sm">
@@ -224,11 +224,11 @@ function TaskDistributionCard({ selectedAgent }) {
   );
 }
 
-function AgentClientsTab({ selectedAgent }) {
+function AgentClientsTab({ selectedAgent }: { selectedAgent: any }) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {selectedAgent.clients.length > 0 ? (
-        selectedAgent.clients.map((client) => (
+        selectedAgent.clients.map((client: any) => (
           <ClientCard key={client.id} client={client} />
         ))
       ) : (
@@ -246,7 +246,7 @@ function AgentClientsTab({ selectedAgent }) {
   );
 }
 
-function ClientCard({ client }) {
+function ClientCard({ client }: { client: any }) {
   return (
     <div className="rounded-lg border shadow-sm">
       <div className="p-4">
@@ -345,8 +345,13 @@ function AgentTasksTab({
   agents,
   reassignedTasks,
   handleReassignTask,
+}: {
+  selectedAgent: any;
+  agents: any[];
+  reassignedTasks: Record<string, any>;
+  handleReassignTask: (taskId: string, targetAgentId: string) => void;
 }) {
-  const tasks = getAllTasks(selectedAgent, reassignedTasks);
+  const tasks = getAllTasks(selectedAgent, reassignedTasks) as any[];
 
   return (
     <div className="rounded-md border">
@@ -361,7 +366,7 @@ function AgentTasksTab({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {tasks.map((task) => (
+          {tasks.map((task: any) => (
             <TableRow
               key={task.id}
               className={task.reassigned ? "bg-muted/50" : ""}
@@ -403,6 +408,11 @@ function ReassignTaskPopover({
   agents,
   selectedAgentId,
   handleReassignTask,
+}: {
+  task: any;
+  agents: any[];
+  selectedAgentId: string;
+  handleReassignTask: (taskId: string, targetAgentId: string) => void;
 }) {
   return (
     <Popover>
@@ -418,8 +428,8 @@ function ReassignTaskPopover({
             <CommandEmpty>No free agents found</CommandEmpty>
             <CommandGroup>
               {agents
-                .filter((a) => a.freeSlots > 0 && a.id !== selectedAgentId)
-                .map((agent) => (
+                .filter((a: any) => a.freeSlots > 0 && a.id !== selectedAgentId)
+                .map((agent: any) => (
                   <CommandItem
                     key={agent.id}
                     value={agent.id}
@@ -439,7 +449,7 @@ function ReassignTaskPopover({
   );
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status }: { status: string }) {
   switch (status) {
     case "free":
       return <Badge className="bg-blue-500 hover:bg-blue-600">Free</Badge>;
@@ -470,7 +480,7 @@ function StatusBadge({ status }) {
   }
 }
 
-function StatusIcon({ status }) {
+function StatusIcon({ status }: { status: string }) {
   switch (status) {
     case "completed":
       return <Check className="h-4 w-4 text-green-500" />;

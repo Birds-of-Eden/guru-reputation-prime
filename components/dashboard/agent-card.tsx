@@ -68,7 +68,7 @@ export function AgentCard({ agent, onViewDetails }: AgentCardProps) {
   );
 }
 
-function StatusBadge({ status }) {
+function StatusBadge({ status } : { status: any }) {
   switch (status) {
     case "free":
       return <Badge className="bg-blue-500 hover:bg-blue-600">Free</Badge>;
