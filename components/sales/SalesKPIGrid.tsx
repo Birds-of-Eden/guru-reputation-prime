@@ -21,9 +21,11 @@ import CountUp from "react-countup";
 export function SalesKPIGrid({
   summary,
   isLoading,
+  trendData,
 }: {
   summary: any;
   isLoading: boolean;
+  trendData?: any;
 }) {
   const KPIs = [
     {

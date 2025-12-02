@@ -9,15 +9,17 @@ interface AssetTypeBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export function AssetTypeBadge({ type, ...props }: AssetTypeBadgeProps) {
-  const typeMap: Record<SiteAssetType, { label: string; variant: BadgeVariant }> = {
+  const typeMap: Partial<Record<SiteAssetType, { label: string; variant: BadgeVariant }>> = {
     social_site: { label: 'Social Site', variant: 'default' },
     web2_site: { label: 'Web 2.0', variant: 'secondary' },
     other_asset: { label: 'Other', variant: 'outline' },
   }
 
+  const meta = typeMap[type] ?? { label: type.replace(/_/g, ' '), variant: 'outline' as BadgeVariant }
+
   return (
-    <Badge variant={typeMap[type].variant} {...props}>
-      {typeMap[type].label}
+    <Badge variant={meta.variant} {...props}>
+      {meta.label}
     </Badge>
   )
 }

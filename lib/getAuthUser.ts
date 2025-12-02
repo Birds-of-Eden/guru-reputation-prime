@@ -6,8 +6,8 @@ import { cookies } from "next/headers";
 import { amScopeCheck, amCeoScopeCheck, canImpersonate } from "./impersonation";
 
 export async function getAuthUser() {
-  const session = await getServerSession(authOptions);
-  const baseUser = session?.user ?? null;
+  const session: any = await getServerSession(authOptions as any);
+  const baseUser = (session?.user as any) ?? null;
   if (!baseUser?.id) return null;
 
   // ⬇️ Dynamic API: must await

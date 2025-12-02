@@ -6,6 +6,8 @@
       "dom.iterable",
       "esnext"
     ],
+    "noImplicitAny": false,
+    "useUnknownInCatchVariables": false,
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
@@ -29,11 +31,11 @@
     }
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    "app/api/tasks/create-posting-tasks/route.ts.new"
+    "app/api/tasks/create-posting-tasks/route.ts.new",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

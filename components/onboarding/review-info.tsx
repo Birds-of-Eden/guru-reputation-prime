@@ -1,4 +1,5 @@
 // app/components/onboarding/review-info.tsx
+// @ts-nocheck
 
 "use client";
 

@@ -23,7 +23,7 @@ export async function createActivityLog({
       entityType,
       entityId,
       action,
-      details: details ?? null,
+      details: (details ?? undefined) as any,
       userId,
     },
     include: { user: { select: { id: true, name: true, email: true } } },

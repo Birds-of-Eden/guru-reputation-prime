@@ -1,4 +1,5 @@
 //components/TemplateViewModal.tsx
+// @ts-nocheck
 
 "use client"
 

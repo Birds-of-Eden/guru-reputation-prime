@@ -1099,7 +1099,7 @@ useEffect(() => {
           isOpen={isCreateTaskModalOpen}
           onClose={() => setIsCreateTaskModalOpen(false)}
           onSuccess={() => {
-            fetchTasks(); // Refresh the tasks list
+            mutate(); // Refresh the tasks list
           }}
           clientId={clientId}
         />

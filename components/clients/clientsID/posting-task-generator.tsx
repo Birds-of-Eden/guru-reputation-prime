@@ -25,12 +25,15 @@ import { toast } from "sonner";
 
 interface PostingTaskGeneratorProps {
   taskId: string;
+  taskName?: string;
+  assignmentId?: string;
   assetName: string;
-  clientId: string;
+  clientId?: string;
   clientName: string;
   defaultFrequency?: number;
   clientDueDate?: Date | null;
   onSuccess?: () => void;
+  isClientOverride?: boolean;
 }
 
 export function PostingTaskGenerator({

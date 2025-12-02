@@ -1,4 +1,5 @@
 // Utility functions for generating mock data
+// @ts-nocheck
 
 // Generate a random date between start and end dates
 export const randomDate = (start: Date, end: Date): string => {

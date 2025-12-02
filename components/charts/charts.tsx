@@ -92,7 +92,11 @@ export function BarChart({
             return value;
           }}
         />
-        <Tooltip content={<ChartTooltipContent config={{}} />} />
+        <Tooltip
+          content={(props) => (
+            <ChartTooltipContent {...(props as any)} config={{}} />
+          )}
+        />
         <Legend />
         {categories.map((category, index) => (
           <Bar key={category} dataKey={category} fill={colors[index]} />
@@ -147,7 +151,11 @@ export function PieChart({
             <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
           ))}
         </Pie>
-        <Tooltip content={<ChartTooltipContent config={{}} />} />
+        <Tooltip
+          content={(props) => (
+            <ChartTooltipContent {...(props as any)} config={{}} />
+          )}
+        />
         <Legend />
       </RechartsPieChart>
     </RechartsResponsiveContainer>

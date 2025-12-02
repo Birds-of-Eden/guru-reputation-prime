@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 
 // Types
-interface Task {
+export interface Task {
   id: string;
   name: string;
   priority: "low" | "medium" | "high" | "urgent";

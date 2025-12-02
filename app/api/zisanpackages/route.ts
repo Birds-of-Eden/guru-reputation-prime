@@ -33,6 +33,7 @@ export async function GET(request: Request) {
         name: true,
         description: true,
         totalMonths: true,
+        type: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { clients: true, templates: true } },
@@ -154,11 +155,18 @@ export async function POST(request: Request) {
       (typeof headerActor === "string" && headerActor) ||
       null;
 
-    const { name, description, totalMonths, type } = body as {
+    const {
+      name,
+      description,
+      type,
+    } = body as {
       name?: string;
       description?: string | null;
       totalMonths?: number | string | null;
       type?: string;
+    };
+    let { totalMonths } = body as {
+      totalMonths?: number | string | null;
     };
 
     // Basic validation

@@ -52,7 +52,7 @@ interface Client {
     url: string
   }>
   createdAt: string
-  filename: string
+  filename?: string
 }
 
 interface ClientModalProps {

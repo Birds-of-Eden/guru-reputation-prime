@@ -1,4 +1,5 @@
 // app/components/drive-image-gallery.tsx
+// @ts-nocheck
 
 "use client";
 

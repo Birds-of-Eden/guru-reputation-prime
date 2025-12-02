@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Trash, Save, ArrowLeft, Badge } from 'lucide-react'
+import { Plus, Trash, Save, ArrowLeft } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { SiteAssetType } from '@prisma/client'

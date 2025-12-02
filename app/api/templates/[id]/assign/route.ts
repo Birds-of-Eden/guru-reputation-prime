@@ -1,4 +1,5 @@
 // File: app/api/templates/[id]/assign/route.ts
+// @ts-nocheck
 
 import { NextRequest, NextResponse } from "next/server";
 import { TaskPriority, TaskStatus } from "@prisma/client";

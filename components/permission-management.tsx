@@ -67,7 +67,6 @@ interface Template {
     id: string
     agent: {
       id: string
-      id: string
       name: string
       email: string
       image: string

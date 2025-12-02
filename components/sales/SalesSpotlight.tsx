@@ -224,7 +224,7 @@ export function SalesSpotlight({
                     />
                     <Tooltip
                       formatter={(value, name) => [
-                        `${value.toFixed(1)}%`,
+                        `${Number(value).toFixed(1)}%`,
                         name,
                       ]}
                       contentStyle={{

@@ -40,4 +40,45 @@ export async function signOut() {
   return true;
 }
 
+type SignUpPayload = {
+  name?: string;
+  email: string;
+  password: string;
+  role?: string;
+};
+
+type SignUpCallbacks = {
+  onRequest?: () => void;
+  onSuccess?: () => void;
+  onError?: (ctx: { error: Error }) => void;
+};
+
+// Minimal client-side signup helper to keep legacy UI working.
+export const signUp = {
+  async email(payload: SignUpPayload, callbacks?: SignUpCallbacks) {
+    callbacks?.onRequest?.();
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: payload.name,
+          email: payload.email,
+          password: payload.password,
+          roleId: payload.role,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to sign up");
+      }
+
+      callbacks?.onSuccess?.();
+    } catch (error: any) {
+      callbacks?.onError?.({ error: error instanceof Error ? error : new Error("Sign up failed") });
+    }
+  },
+};
+
 export default { signOut };

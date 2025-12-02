@@ -3,5 +3,5 @@
 import SheetBuilderPage from "@/components/dataentry/DataEntryMonitoringTask";
 
 export default function DataEntryPage() {
-    return <SheetBuilderPage />;
+    return <SheetBuilderPage open onOpenChange={() => {}} />;
 }

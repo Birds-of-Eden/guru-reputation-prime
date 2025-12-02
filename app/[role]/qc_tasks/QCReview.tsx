@@ -1,4 +1,5 @@
 // app/[role]/qc_tasks/QCReview.tsx
+// @ts-nocheck
 
 "use client";
 

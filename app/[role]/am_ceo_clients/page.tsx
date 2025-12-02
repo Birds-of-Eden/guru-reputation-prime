@@ -166,8 +166,8 @@ export default function ClientsPage() {
         const amLabel = accountManagers.find(
           (am) => am.id === effectiveAmId
         )?.label;
-        let amName = null;
-        let amEmail = null;
+        let amName: string | null = null;
+        let amEmail: string | null = null;
 
         if (amLabel) {
           // Attempt to parse "Name (email)" format

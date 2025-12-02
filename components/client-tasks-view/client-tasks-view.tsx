@@ -171,6 +171,10 @@ interface ClientTasksViewProps {
   clientName: string;
   agentId: string;
   onBack: () => void;
+  isLockedBySelf?: boolean;
+  lockedTaskId?: string | null;
+  lockedTaskName?: string | null;
+  excludedCategories?: string[];
 }
 interface Agent {
   id: string;
@@ -300,6 +304,10 @@ export function ClientTasksView({
   clientName,
   agentId,
   onBack,
+  isLockedBySelf = false,
+  lockedTaskId = null,
+  lockedTaskName = null,
+  excludedCategories = EXCLUDED_CATEGORIES,
 }: ClientTasksViewProps) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);

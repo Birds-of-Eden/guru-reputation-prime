@@ -399,7 +399,7 @@ export async function DELETE(request: NextRequest) {
       await logActivity({
         entityType: "User",
         entityId: userToDelete.id,
-        actorId: actorId ?? null,
+        userId: actorId ?? undefined,
         action: "delete",
         details: { email: userToDelete.email, name: userToDelete.name },
       });

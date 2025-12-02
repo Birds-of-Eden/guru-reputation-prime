@@ -13,7 +13,6 @@ import {
 function isSecure(req: NextRequest) {
   const proto =
     req.headers.get("x-forwarded-proto") ??
-    // @ts-expect-error - nextUrl.protocol exists in Next runtime
     req.nextUrl?.protocol?.replace(":", "") ??
     "http";
   return proto === "https";
@@ -30,7 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ✅ NextAuth-এর বর্তমান সেশন (অ্যাডমিন/AM/ইত্যাদি)
-    const session = await getServerSession(authOptions);
+    const session: any = await getServerSession(authOptions as any);
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }

@@ -42,7 +42,7 @@ import type { Task as BaseTask } from "./client-tasks-view";
 
 type Task = BaseTask & {
   // Additional properties specific to TaskList
-  reassignNotes?: string;
+  reassignNotes?: string | null;
   username?: string | null;
   password?: string;
   email?: string | null;

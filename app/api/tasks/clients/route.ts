@@ -102,6 +102,7 @@ export async function GET(req: Request) {
   }
 
   for (const task of tasks) {
+    if (!task.clientId) continue;
     const bucket = buckets.get(task.clientId);
     if (!bucket) continue;
 

@@ -111,10 +111,10 @@ export function AssetCard({
                   <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-1">
                     {displayFrequency > 0 ? `${displayFrequency}/month` : "Not set"}
                     {hasOverride && (
-                      <Zap className="h-3 w-3 text-yellow-500" title="Client Override" />
+                      <Zap className="h-3 w-3 text-yellow-500" aria-label="Client Override" />
                     )}
                     {!hasOverride && displayFrequency > 0 && (
-                      <Lock className="h-3 w-3 text-slate-400" title="Template Default" />
+                      <Lock className="h-3 w-3 text-slate-400" aria-label="Template Default" />
                     )}
                   </p>
                 </div>

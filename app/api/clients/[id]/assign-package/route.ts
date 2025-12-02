@@ -29,7 +29,7 @@ export async function PUT(
     const updatedClient = await prisma.client.update({
       where: { id: clientId },
       data: { packageId },
-      include: { socialLinks: true, package: true },
+      include: { package: true },
     });
 
     return NextResponse.json(

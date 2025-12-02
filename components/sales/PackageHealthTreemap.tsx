@@ -109,7 +109,7 @@ export function PackageHealthTreemap({
               data={nodes}
               dataKey="size"
               stroke="#fff"
-              content={(props: any) => {
+              content={((props: any) => {
                 const {
                   x,
                   y,
@@ -179,7 +179,7 @@ export function PackageHealthTreemap({
                     >{`Days Left: ${avgDaysLeft}`}</text>
                   </g>
                 );
-              }}
+              }) as any}
             >
               <ReTooltip
                 contentStyle={{

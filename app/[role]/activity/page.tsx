@@ -125,11 +125,11 @@ export default function ActivityPage() {
   }, [pagination?.totalPages]);
 
   // ⚡ OPTIMIZED: Memoize page numbers calculation
-  const getPageNumbers = useCallback(() => {
+  const getPageNumbers = useCallback((): (number | string)[] => {
     if (!pagination) return [];
 
     const { currentPage, totalPages } = pagination;
-    const pages = [];
+    const pages: (number | string)[] = [];
     const maxVisible = 5;
 
     if (totalPages <= maxVisible) {

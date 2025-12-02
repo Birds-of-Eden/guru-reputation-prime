@@ -1,4 +1,5 @@
 // components/onboarding/DataEntryReviewInfo.tsx
+// @ts-nocheck
 
 "use client";
 

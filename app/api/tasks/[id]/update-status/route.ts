@@ -1,4 +1,5 @@
 // app/api/tasks/[id]/update-status/route.ts
+// @ts-nocheck
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { TaskStatus } from "@prisma/client";

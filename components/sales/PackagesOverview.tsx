@@ -12,10 +12,16 @@ export function PackagesOverview({
   byPackage,
   timeseries,
   isLoading,
+  summary,
+  selectedPkg,
+  setSelectedPkg,
 }: {
   byPackage: any[];
   timeseries: any[];
   isLoading: boolean;
+  summary?: any;
+  selectedPkg?: string;
+  setSelectedPkg?: (pkg: string) => void;
 }) {
   const safePackages = Array.isArray(byPackage) ? byPackage : [];
   const safeSeries = Array.isArray(timeseries) ? timeseries : [];

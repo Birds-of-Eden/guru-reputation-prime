@@ -29,7 +29,7 @@ export async function GET(req: Request) {
     const filename = searchParams.get("filename") || "";
 
     // ---- Take token from session (preferred). We keep query support only as a fallback for legacy. ----
-    const session = await getServerSession(authOptions as any);
+    const session: any = await getServerSession(authOptions as any);
     const sessionToken =
       (session?.user as any)?.googleAccessToken?.toString() || null;
     const queryToken = searchParams.get("accessToken"); // optional legacy
