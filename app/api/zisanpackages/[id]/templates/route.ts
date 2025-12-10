@@ -105,11 +105,12 @@ export async function GET(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { packageId: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Normalize the package id (handles URLs like /id-abc123)
-    const packageId = params.packageId.replace(/^id-/, "");
+    const { id: rawPackageId } = await params;
+    const packageId = rawPackageId.replace(/^id-/, "");
 
     const { templateId } = await req.json().catch(() => ({} as any));
     if (!templateId || typeof templateId !== "string") {

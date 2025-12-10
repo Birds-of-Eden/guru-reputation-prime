@@ -57,8 +57,9 @@ async function fetchQcTasks() {
 export default async function RoleBasedPage({
   params,
 }: {
-  params: { role: Role };
+  params: Promise<{ role: Role }>;
 }) {
+  await params; // Next.js 15 requires the params promise even when unused
   const user = await getAuthUser();
   if (!user) redirect("/auth/sign-in");
 

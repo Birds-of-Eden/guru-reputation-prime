@@ -23,7 +23,7 @@ function isValidUrl(u: string) {
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // In Next.js 15+, params is async and needs to be awaited

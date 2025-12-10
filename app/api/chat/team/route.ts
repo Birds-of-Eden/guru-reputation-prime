@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthUser } from "@/lib/getAuthUser";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -38,14 +39,17 @@ export async function POST(req: Request) {
   }
 
   // If a team conversation already exists, return it (and ensure the requester is a participant)
+  const conversationWhere: Prisma.ConversationWhereInput &
+    Record<string, unknown> = {
+    type: "team",
+  };
+  conversationWhere.conversation_field_06 = {
+    path: ["teamId"],
+    equals: teamId,
+  };
+
   const existing = await prisma.conversation.findFirst({
-    where: {
-      type: "team",
-      conversation_field_06: {
-        path: ["teamId"],
-        equals: teamId,
-      },
-    },
+    where: conversationWhere,
     include: { participants: true },
   });
 
@@ -75,14 +79,16 @@ export async function POST(req: Request) {
   }));
 
   // Create conversation
+  const createData: Record<string, unknown> = {
+    type: "team",
+    title: title || `Team: ${team.name}`,
+    createdBy: { connect: { id: me.id } },
+    participants: { create: participantsCreate },
+  };
+  createData.conversation_field_06 = { teamId };
+
   const created = await prisma.conversation.create({
-    data: {
-      type: "team",
-      title: title || `Team: ${team.name}`,
-      createdBy: { connect: { id: me.id } },
-      conversation_field_06: { teamId },
-      participants: { create: participantsCreate },
-    },
+    data: createData as Prisma.ConversationCreateInput,
     select: { id: true },
   });
 

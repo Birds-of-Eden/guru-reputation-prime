@@ -21,6 +21,15 @@ const CONTEXT_KEYS: (keyof ConversationContext)[] = [
   "taskId",
 ];
 
+type ConversationWithMeta = Prisma.ConversationGetPayload<{
+  include: {
+    participants: {
+      include: { user: { select: { id: true; name: true; image: true } } };
+    };
+    messages: { take: 1; orderBy: { createdAt: "desc" } };
+  };
+}> & { conversation_field_06?: Prisma.JsonValue | null };
+
 function buildConversationContext(context: ConversationContext) {
   const payload: Record<string, string> = {};
   for (const key of CONTEXT_KEYS) {
@@ -32,9 +41,7 @@ function buildConversationContext(context: ConversationContext) {
   return Object.keys(payload).length ? payload : undefined;
 }
 
-function applyConversationContext<
-  T extends { conversation_field_06?: Prisma.JsonValue | null }
->(conversation: T) {
+function applyConversationContext(conversation: ConversationWithMeta) {
   const raw = conversation.conversation_field_06;
   const meta =
     raw && typeof raw === "object" && !Array.isArray(raw)
@@ -49,7 +56,12 @@ function applyConversationContext<
   };
 }
 
-function contextFilter(field: keyof ConversationContext, value?: string) {
+type ConversationWithContext = ReturnType<typeof applyConversationContext>;
+
+function contextFilter(
+  field: keyof ConversationContext,
+  value?: string
+): Record<string, unknown> | undefined {
   if (!value) return undefined;
   return {
     conversation_field_06: {
@@ -163,23 +175,29 @@ export async function POST(req: Request) {
     taskId,
   });
 
-  const conv = await prisma.conversation.create({
-    data: {
-      type,
-      title: normalizedTitle || null,
-      createdBy: { connect: { id: me.id } },
-      ...(contextPayload ? { conversation_field_06: contextPayload } : {}),
-      participants: {
-        create: uniqueMemberIds.map((uid) => ({
-          userId: uid,
-          role: uid === me.id ? "owner" : "member",
-        })),
-      },
+  const createData: Record<string, unknown> = {
+    type,
+    title: normalizedTitle || null,
+    createdBy: { connect: { id: me.id } },
+    participants: {
+      create: uniqueMemberIds.map((uid) => ({
+        userId: uid,
+        role: uid === me.id ? "owner" : "member",
+      })),
     },
+  };
+
+  if (contextPayload) {
+    createData.conversation_field_06 = contextPayload;
+  }
+
+  const conv = await prisma.conversation.create({
+    data: createData as Prisma.ConversationCreateInput,
     include: {
       participants: {
         include: { user: { select: { id: true, name: true, image: true } } },
       },
+      messages: { take: 1, orderBy: { createdAt: "desc" } },
     },
   });
 
@@ -222,21 +240,29 @@ export async function GET(req: Request) {
   });
 
   const convIds = cps.map((c) => c.conversationId);
-  const conversationsRaw = await prisma.conversation.findMany({
-    where: {
-      id: { in: convIds },
-      ...(filterType ? { type: filterType } : {}),
-      ...(contextFilter("teamId", filterTeamId) || {}),
-    },
+  const conversationWhere: Prisma.ConversationWhereInput &
+    Record<string, unknown> = {
+    id: { in: convIds },
+    ...(filterType ? { type: filterType } : {}),
+  };
+  const teamFilter = contextFilter("teamId", filterTeamId);
+  if (teamFilter) {
+    Object.assign(conversationWhere, teamFilter);
+  }
+
+  const conversationsRaw = (await prisma.conversation.findMany({
+    where: conversationWhere,
     include: {
       participants: {
         include: { user: { select: { id: true, name: true, image: true } } },
       },
       messages: { take: 1, orderBy: { createdAt: "desc" } },
     },
-  });
+  })) as ConversationWithMeta[];
 
-  const conversations = conversationsRaw.map(applyConversationContext);
+  const conversations: ConversationWithContext[] = conversationsRaw.map(
+    applyConversationContext
+  );
 
   const lastReadBy: Record<string, Date | null> = {};
   cps.forEach((c) => (lastReadBy[c.conversationId] = c.lastReadAt ?? null));

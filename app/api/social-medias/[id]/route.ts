@@ -7,8 +7,11 @@ const normalizePlatform = (input: unknown): string => {
   return raw || "OTHER"
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function PUT(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params
   try {
     const body = await req.json() as {
       platform?: string | null

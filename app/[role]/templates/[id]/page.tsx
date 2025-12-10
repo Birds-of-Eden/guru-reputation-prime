@@ -46,7 +46,11 @@ interface Template {
   }[]
 }
 
-export default function TemplateDetailPage({ params }: { params: { id: string } }) {
+export default function TemplateDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const [template, setTemplate] = useState<Template | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -60,29 +64,41 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
     defaultIdealDurationMinutes: undefined as number | undefined,
   })
   const router = useRouter()
+  const [resolvedTemplateId, setResolvedTemplateId] = useState<string | null>(null)
 
   useEffect(() => {
+    let isMounted = true
+
     const fetchTemplate = async () => {
       try {
-        const response = await fetch(`/api/templates/${params.id}`)
+        const { id } = await params
+        if (!isMounted) return
+        setResolvedTemplateId(id)
+        const response = await fetch(`/api/templates/${id}`)
         const data = await response.json()
         setTemplate(data)
       } catch (error) {
         console.error('Error fetching template:', error)
         toast('Failed to load template')
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false)
+        }
       }
     }
-    
+
     fetchTemplate()
-  }, [params.id, toast])
+
+    return () => {
+      isMounted = false
+    }
+  }, [params, toast])
 
   const handleSave = async () => {
-    if (!template) return
+    if (!template || !resolvedTemplateId) return
     
     try {
-      const response = await fetch(`/api/templates/${params.id}`, {
+      const response = await fetch(`/api/templates/${resolvedTemplateId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -107,10 +123,12 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
   }
 
   const handleAddAsset = async () => {
-    if (!newAsset.name || !template) return
+    if (!newAsset.name || !template || !resolvedTemplateId) return
     
     try {
-      const response = await fetch(`/api/templates/${params.id}/assets`, {
+      const response = await fetch(
+        `/api/templates/${resolvedTemplateId}/assets`,
+        {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -141,11 +159,15 @@ export default function TemplateDetailPage({ params }: { params: { id: string } 
 
   const handleDeleteAsset = async (assetId: number) => {
     if (!confirm('Are you sure you want to delete this asset?')) return
+    if (!resolvedTemplateId) return
     
     try {
-      await fetch(`/api/templates/${params.id}/assets/${assetId}`, {
-        method: 'DELETE',
-      })
+      await fetch(
+        `/api/templates/${resolvedTemplateId}/assets/${assetId}`,
+        {
+          method: 'DELETE',
+        }
+      )
       
       if (template) {
         setTemplate({

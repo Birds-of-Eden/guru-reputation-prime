@@ -33,7 +33,6 @@ export async function GET(request: Request) {
         name: true,
         description: true,
         totalMonths: true,
-        type: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { clients: true, templates: true } },
@@ -119,7 +118,6 @@ export async function GET(request: Request) {
         name: p.name,
         description: p.description,
         totalMonths: p.totalMonths,
-        type: p.type,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
         stats: {

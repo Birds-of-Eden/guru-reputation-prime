@@ -5,9 +5,9 @@ import prisma from "@/lib/prisma";
 
 export async function PUT(
   req: NextRequest,
-  context: { params: { clientId: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const clientId = context.params.clientId;
+  const { id: clientId } = await context.params;
 
   try {
     const body = await req.json();

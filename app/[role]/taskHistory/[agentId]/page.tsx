@@ -1,7 +1,11 @@
 import TaskHistory, { type TaskHistoryRow } from "@/components/client-tasks-view/TaskHistory";
 
-export default async function Page({ params }: { params: { agentId: string } }) {
-  const { agentId } = params;
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ agentId: string }>;
+}) {
+  const { agentId } = await params;
 
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/tasks/history/${agentId}`,
